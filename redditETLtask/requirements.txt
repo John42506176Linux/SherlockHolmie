@@ -1,0 +1,13 @@
+progressbar2
+pyarrow
+requests
+pgvector
+SQLAlchemy
+psycopg2
+sshtunnel
+pandas
+tqdm
+numpy
+openai
+langchain-openai
+python-dotenv==1.0.1
