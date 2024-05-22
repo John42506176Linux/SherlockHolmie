@@ -1,0 +1,15 @@
+*.swp
+package-lock.json
+__pycache__
+.pytest_cache
+.venv
+*.egg-info
+.env
+*.csv
+sherlock-aws-key
+sherlock-aws-key.pub
+*.ini
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
