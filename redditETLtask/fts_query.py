@@ -47,6 +47,6 @@ with psycopg2.connect(connection_string) as conn:
 
         # Print the rows
         for row in rows:
-            print(row)
+            print(row['body'])
 
 # The connection will be closed automatically after exiting the 'with' block

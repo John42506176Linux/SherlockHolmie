@@ -1,14 +1,12 @@
-from openai import OpenAI
 from langchain_openai import OpenAIEmbeddings
 import math
 import numpy as np
 import time
-from pathlib import Path
 import pyarrow.parquet as pq
 from tqdm import tqdm
-from models import RedditPost
+from models.models import RedditPost
 from datetime import datetime
-from models import db
+from models.models import DatabaseManager
 import logging
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
@@ -68,21 +66,21 @@ def process_chunk_and_append_to_file(chunk):
             }
         )
         log.info("Inserting posts")
-        db.execute(stmt)
-        db.commit()
+        db_manager.db.execute(stmt)
+        db_manager.db.commit()
         log.info(f"Elapsed Time:{time.time()-start_time}")
         log.info("Posts inserted")
         log.info("Documents embedded and added successfully")
     except IntegrityError as e:
-        db.rollback()
+        db_manager.db.rollback()
         log.error(f"INTEGRITY ERROR WHEN Inserting documents:"[0:500])
         raise Exception(e)
     except Exception as e:
-        db.rollback()
+        db_manager.db.rollback()
         log.error(f"Error occurred Inserting Batch Documents: {e}"[0:500])
 
 
-def bulk_embed_posts():
+def bulk_embed_posts(db_manager:DatabaseManager):
     chunksize = 10000  # Adjust based on your memory constraints
     parquet_file = pq.ParquetFile('reddit_data_filtered.parquet')
     start_time = time.time()
@@ -104,12 +102,13 @@ def bulk_embed_posts():
     log.info(f"Elapsed Time: {time.time() - start_time}")
 
 if __name__ == '__main__':
+    db_manager = DatabaseManager()
     try:
         log.info("Starting Embedding")
-        bulk_embed_posts()
-        db.close()
+        bulk_embed_posts(db_manager)
+        db_manager.db.close()
     except Exception as e:
         log.error(f'ERROR embedding reddit data:{e}'[0:500])
-        db.rollback()
-        db.close()
+        db_manager.db.rollback()
+        db_manager.db.close()
         raise Exception(e)

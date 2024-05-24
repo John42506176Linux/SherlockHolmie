@@ -23,11 +23,10 @@ user_agents = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36'
 ]
 
-pause_event = threading.Event()
 log = logging.getLogger("bot")
 
 class DataDownloader:
-    def __init__(self,start_date, end_date, subreddit,output_folder,is_post,pause_event):
+    def __init__(self,start_date, end_date, subreddit,output_folder,is_post):
         self.url = f"https://arctic-shift.photon-reddit.com/api/{'posts' if is_post else 'comments'}/search?sort=asc&subreddit={subreddit}"
         self.start_date = start_date.timestamp()
         self.end_date = end_date.timestamp()
@@ -69,7 +68,6 @@ class DataDownloader:
         # Create the output folder if it doesn't exist
         os.makedirs(output_folder, exist_ok=True)
         self.parquet_writer = None
-        self.pause_event = pause_event
 
     def verify_parquet_file(self, file_path):
         try:
@@ -131,11 +129,6 @@ class DataDownloader:
                 time.sleep(wait_time)
 
     def write_to_file(self, data):
-        if self.pause_event.is_set():
-            # Handle pause logic here, e.g., break the loop, save state, etc.
-            print("Download paused.")
-            sys.exit(0)
-            return
         fields = []
         # print(data)
         if self.is_post:
@@ -151,78 +144,7 @@ class DataDownloader:
 
         self.parquet_writer.write_table(table)
 
-def get_user_interactions(author):
-    retry_count = 0
-    while retry_count <= 5:
-        try:
-            subreddit_interaction_url = f"https://arctic-shift.photon-reddit.com/api/user_interactions/subreddits?author={author}"
-            response = requests.get(subreddit_interaction_url)
-            
-            if response.status_code == 400:
-                error_data = response.json()
-                if 'error' in error_data  and 'not supported' in error_data['error']:
-                    log.error(f"Author: {author} not supported for interaction data")
-                    return None
-                else:
-                    log.error(f'400 error for Author {author}: error:{error_data}')
-                    return None
-            if response.status_code == 429:
-                log.info("Rate limit exceeded. Waiting before retrying.")
-                retry_count += 1
-                if retry_count > 5:  # Max retry attempts
-                    log.error("Max retry attempts reached. Exiting.")
-                    return None
-                # Exponential backoff
-                wait_time = min(2 ** retry_count, 360)  # Limit wait time to 360 seconds (6 minutes)
-                log.info(f"Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-                continue  # Retry the request
-            response.raise_for_status()  # Raise HTTPError for non-200 status codes
-            data = response.json()
-            if 'error' in data or 'data' not in data:
-                raise Exception(data.get('error', 'No data returned'))
-            return data['data']
-        except Exception as e:
-            log.error(f"Interaction Data for user {author} Error: {e}")
-    return None
-
-def get_user_description(author):
-    retries = 0
-    max_retries = 5
-    while retries <= max_retries:
-        response = None
-        try:
-            url = f"https://www.reddit.com/u/{author}/about.json"
-            user_agent = random.choice(user_agents)
-            # Set the headers
-            headers = {'User-Agent': user_agent}
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                data = response.json()
-                return data['data']['subreddit']['public_description']
-            elif response.status_code == 404:
-                log.error(f"Author {author} not found (404).")
-                return None
-            elif response.status_code == 429:
-                log.error(f"Rate Limit on fetching user description for {author}")
-                retries += 1
-                if retries > max_retries:
-                    log.error("Max retry attempts reached. Exiting.")
-                    return None
-                # Exponential backoff
-                wait_time = min(2 ** retries, 360)  # Limit wait time to 360 seconds (6 minutes)
-                log.info(f"Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-        except Exception as e:
-            log.error(f"Request Error fetching user description: {e}")
-            return None
-    return None
-
-def download_subreddit_data(start_date, end_date, subreddit, output_folder, is_post, pause_event):
+def download_subreddit_data(start_date, end_date, subreddit, output_folder, is_post):
     # Check if the subreddit exists in the database
-    downloader = DataDownloader(start_date, end_date, subreddit, output_folder, is_post, pause_event)
+    downloader = DataDownloader(start_date, end_date, subreddit, output_folder, is_post)
     downloader.download_data()
-
-def signal_handler(signal_received, frame):
-    print("SIGINT received, signaling threads to pause...")
-    pause_event.set()
