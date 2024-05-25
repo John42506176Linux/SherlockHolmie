@@ -29,5 +29,3 @@ class TunnelManager:
         if self.server:
             self.server.stop()
             print("Tunnel closed")
-
-tunnel_manager = TunnelManager()

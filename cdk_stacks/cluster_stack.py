@@ -26,20 +26,17 @@ class ClusterStack(core.Stack):
         # Create a ECS cluster
         self.cluster = ecs.Cluster(self, 'RedditDownloadCluster', vpc=vpc.vpc)
 
-        # Define the Docker image asset from a local Dockerfile
-        docker_image_asset = assets.DockerImageAsset(self, 'RedditDockerImage', directory='redditETLtask')
-
         # Create a task definition with the local Docker image asset
         self.task_definition = ecs.FargateTaskDefinition(self, 'RedditETLEmbeddingTask',
             memory_limit_mib=30720,
             cpu=4096,
-            ephemeral_storage_gib=70
+            ephemeral_storage_gib=40
         )
         log_group = logs.LogGroup(self, 'RedditETLLogGroup',
             retention=logs.RetentionDays.ONE_WEEK
         )
-        container = self.task_definition.add_container('RedditContainer',
-            image=ecs.ContainerImage.from_docker_image_asset(docker_image_asset),
+        self.task_definition.add_container('RedditContainer',
+            image=ecs.RepositoryImage.from_registry('sherlockholmie/reddit-etl-task:latest'),
             logging=ecs.LogDriver.aws_logs(stream_prefix='RedditETL', log_group=log_group),
             environment={
                 'DB_HOST': db_host,

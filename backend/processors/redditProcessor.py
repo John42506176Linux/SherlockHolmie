@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from models.models import DatabaseManager
+from managers.databaseManager import DatabaseManager
 import logging.handlers
 
 log = logging.getLogger("bot")
@@ -68,10 +68,7 @@ class RedditDataProcessor:
 
     def process_data(self):
         self.load_data()
-        log.info(f"Total Posts: {self.posts_df.shape[0]}")
         if not self.posts_df.empty or not self.comments_df.empty:
-            log.info(f"Posts Data:{self.posts_df.head()}")
-            log.info(f"Comments Data:{self.comments_df.head()}")
             self.filter_data()
         else:
             raise Exception("No More data to download")

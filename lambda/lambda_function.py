@@ -21,6 +21,7 @@ def lambda_handler(event, context):
     subreddits = event.get('subreddits')
     years = event.get('years', 2)
     update = event.get('update',True)
+    recreate = event.get('recreate',False)
 
     if not subreddits or not isinstance(subreddits, list):
         return {
@@ -61,7 +62,8 @@ def lambda_handler(event, context):
                             {'name': 'SUBREDDIT', 'value': subreddit},
                             {'name': 'ENV', 'value': 'PROD'},
                             {'name': 'YEARS', 'value': str(years)},
-                            {'name': 'UPDATE','value':str(update)}
+                            {'name': 'UPDATE','value':str(update)},
+                            {'name': 'RECREATE','value': str(recreate)}
                         ]
                     }
                 ],

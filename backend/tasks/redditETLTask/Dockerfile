@@ -9,8 +9,5 @@ WORKDIR /app
 # Install any dependencies if there's a requirements.txt
 RUN pip install -r requirements.txt
 
-# Make downloader.sh executable
-RUN chmod +x download.sh
-
 # Command to run the shell script
-CMD ["./download.sh"]
+CMD ["python","tasks/redditETLTask/main.py"]

@@ -5,13 +5,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import os
 import glob
-import threading
-import sys
-import os
-import threading
-import time
 import logging.handlers
-import random
 
 # List of User-Agent strings
 user_agents = [
@@ -25,7 +19,7 @@ user_agents = [
 
 log = logging.getLogger("bot")
 
-class DataDownloader:
+class RedditDownloader:
     def __init__(self,start_date, end_date, subreddit,output_folder,is_post):
         self.url = f"https://arctic-shift.photon-reddit.com/api/{'posts' if is_post else 'comments'}/search?sort=asc&subreddit={subreddit}"
         self.start_date = start_date.timestamp()
@@ -146,5 +140,5 @@ class DataDownloader:
 
 def download_subreddit_data(start_date, end_date, subreddit, output_folder, is_post):
     # Check if the subreddit exists in the database
-    downloader = DataDownloader(start_date, end_date, subreddit, output_folder, is_post)
+    downloader = RedditDownloader(start_date, end_date, subreddit, output_folder, is_post)
     downloader.download_data()

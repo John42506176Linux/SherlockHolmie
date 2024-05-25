@@ -1,11 +1,17 @@
-from datetime import datetime, timedelta
+
+import sys
 import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from datetime import datetime, timedelta
 import concurrent.futures
-from dataDownloader import download_subreddit_data
+from downloaders.redditDownloader import download_subreddit_data
+from embedders.redditEmbedder import RedditEmbedder
 import logging.handlers
 from dotenv import load_dotenv
-from dataProcessor import RedditDataProcessor
-from models.models import Subreddit, RedditPost, DatabaseManager
+from processors.redditProcessor import RedditDataProcessor
+from models.models import Subreddit, RedditPost
+from managers.databaseManager import DatabaseManager
 from sqlalchemy import func
 
 # TODO: Set up full logging
@@ -58,8 +64,8 @@ def full_reddit_download(db_manager: DatabaseManager):
                 print(f"Error encountered: {future.exception()}")
 
 def main():
+    db_manager = DatabaseManager()
     try:
-        db_manager = DatabaseManager()
         if(os.getenv('RECREATE', 'false').lower() == 'true'):
             log.info("Initializing DB")
             db_manager.initialize_database()
@@ -71,11 +77,12 @@ def main():
         processor = RedditDataProcessor(db_manager)
         processor.process_data()
         log.info('Finished Filtering Data')
-        db_manager.db.close()
+        embedder = RedditEmbedder(db_manager)
+        embedder.bulk_embed_posts()
+        db_manager.close()
     except Exception as e:
         log.error(f'ERROR downloading reddit data:{e}')
-        db_manager.db.rollback()
-        db_manager.db.close()
+        db_manager.close()
         raise Exception(e)
 
 if __name__ == '__main__':

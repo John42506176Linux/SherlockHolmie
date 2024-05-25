@@ -3,8 +3,7 @@ import logging.handlers
 from dotenv import load_dotenv
 import os
 from psycopg2 import sql
-from tunnelManager import tunnel_manager
-from datetime import datetime
+from backend.managers.tunnelManager import tunnel_manager
 
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)

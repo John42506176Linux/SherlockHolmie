@@ -9,7 +9,8 @@ __pycache__
 sherlock-aws-key
 sherlock-aws-key.pub
 *.ini
-
+.sh
+deploy.sh
 # CDK asset staging directory
 .cdk.staging
 cdk.out

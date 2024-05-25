@@ -14,7 +14,7 @@ import os
 
 class LambdaStack(core.Stack):
 
-    def __init__(self, scope: Construct, id: str,cluster,vpc, **kwargs) -> None:
+    def __init__(self, scope: Construct, id: str,vpc, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         # Create a Lambda function
@@ -24,18 +24,18 @@ class LambdaStack(core.Stack):
             code=lambda_.Code.from_asset("lambda"),
             timeout=Duration.minutes(5),
             environment={
-                'CLUSTER_ARN': cluster.cluster.cluster_arn,
-                'TASK_DEFINITION_ARN': cluster.task_definition.task_definition_arn,
+                # 'CLUSTER_ARN': cluster.cluster.cluster_arn,
+                # 'TASK_DEFINITION_ARN': cluster.task_definition.task_definition_arn,
             }
         )
         lambda_function.add_environment('SUBNETS', ','.join([subnet.subnet_id for subnet in vpc.vpc.private_subnets]))
         lambda_function.add_environment('SECURITY_GROUP', vpc.task_security_group.security_group_id)
 
         user_role = "arn:aws:iam::791346673593:role/*"
-        lambda_function.role.add_to_policy(iam.PolicyStatement(
-            actions=['ecs:RunTask','iam:PassRole'],
-            resources=[cluster.task_definition.task_definition_arn,user_role]
-        ))
+        # lambda_function.role.add_to_policy(iam.PolicyStatement(
+        #     actions=['ecs:RunTask','iam:PassRole'],
+        #     resources=[cluster.task_definition.task_definition_arn,user_role]
+        # ))
 
         api = apigateway.RestApi(self, 'SherlockApi',
                                   rest_api_name='DownloadSubreddit')

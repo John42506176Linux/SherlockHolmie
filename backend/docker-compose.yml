@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  reddit-etl-task:
+    build:
+      context: .
+      dockerfile: ./tasks/redditETLTask/Dockerfile
+    image: reddit-etl-task
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/code
+    env_file:
+      - ./.env
