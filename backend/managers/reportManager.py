@@ -276,7 +276,7 @@ class ReportManager:
         if self.personas is not None:
             log.error("Personas already initialized")
             return None
-        prompt = f"""Create concise 5 personas for users who relate to the following space -- {self.space} -- based on the given Reddit data.
+        prompt = f"""Create concise 3-5 personas for users who relate to the following space -- {self.space} -- based on the given Reddit data.
         Think step by step in the persona creation process.
         These personas will be evaluated on:
         - Relation to the query (Personas should be relevant to the query)
@@ -399,7 +399,7 @@ class ReportManager:
 
         # Generate insights using the question-answering chain with the top 10 most similar texts as context
 
-        insights = json.loads(self.gemini_qa_chain.run(input_documents=self.top_documents[:1000], question=prompt))["personas"]
+        insights = json.loads(self.gemini_qa_chain.run(input_documents=self.top_documents[:1500], question=prompt))["personas"]
         self.personas = insights
         if "Percentage" not in self.personas[0] and quantify:
             log.info("Starting quantification of personas")
