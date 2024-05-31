@@ -33,3 +33,6 @@ temp
 # Ignore OS generated files
 .DS_Store
 Thumbs.db
+
+# Ignore experiments directory
+experiments/

@@ -7,7 +7,21 @@ services:
     image: reddit-etl-task
     ports:
       - "5000:5000"
-    volumes:
-      - .:/code
     env_file:
       - ./.env
+    volumes:
+      - ./scripts:/scripts
+      - ./files:/files
+
+  report-task:
+    build:
+      context: .
+      dockerfile: ./tasks/painPointTask/Dockerfile
+    image: report-task
+    ports:
+      - "5001:80"  # Map host's port 5001 to container's port 80
+    env_file:
+      - ./.env
+    volumes:
+      - ./:/app
+    command: ["uvicorn", "tasks.painPointTask.main:app", "--host", "0.0.0.0", "--port", "80"]

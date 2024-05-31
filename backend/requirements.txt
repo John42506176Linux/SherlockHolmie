@@ -9,5 +9,9 @@ pandas
 tqdm
 numpy
 openai
-langchain-openai
+langchain-openai==0.1.8
+langchain-aws
+langchain-google-genai 
+langchain-community
 python-dotenv==1.0.1
+fastapi==0.111.0

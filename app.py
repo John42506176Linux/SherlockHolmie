@@ -19,7 +19,7 @@ from cdk_stacks.lambda_stack import LambdaStack
 app = cdk.App()
 vpc = VpcStack(app,"SherlockVPC")
 cluster = ClusterStack(app,"ClusterStack",vpc=vpc)
-LambdaStack(app,"LambdaStack",vpc=vpc)
+LambdaStack(app,"LambdaStack",cluster=cluster,vpc=vpc)
 AuroraServerlessStack(app,"DatabaseStack",vpc=vpc)
 
 app.synth()

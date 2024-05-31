@@ -12,6 +12,10 @@ from downloaders.redditDownloader import user_agents
 import time
 from tqdm import tqdm
 import random
+from sqlalchemy.exc import OperationalError
+from sqlalchemy import text
+from langchain_openai import OpenAIEmbeddings
+
 
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
@@ -51,9 +55,9 @@ class DatabaseManager:
                 log.info("Altering table to add FTS column")
                 cur.execute("ALTER TABLE reddit_posts ADD COLUMN IF NOT EXISTS fts tsvector GENERATED ALWAYS AS (to_tsvector(body)) STORED;")
                 log.info("Adding post_data_index")
-                cur.execute("CREATE INDEX IF NOT EXISTS post_data_index ON reddit_posts USING hnsw (embeddings vector_cosine_ops) WITH (m = 36, ef_construction = 500);")
+                cur.execute("CREATE INDEX IF NOT EXISTS post_data_index ON reddit_posts USING hnsw (embeddings vector_cosine_ops) WITH (m = 16, ef_construction = 64);")
                 log.info("Adding subreddit_data_index")
-                cur.execute("CREATE INDEX IF NOT EXISTS subreddit_data_index ON subreddit USING hnsw (embeddings vector_cosine_ops) WITH (m = 16, ef_construction = 200);")
+                cur.execute("CREATE INDEX IF NOT EXISTS subreddit_data_index ON subreddit USING hnsw (embeddings vector_cosine_ops) WITH (m = 16, ef_construction = 64);")
                 log.info("Adding time_index")
                 cur.execute("CREATE INDEX IF NOT EXISTS time_index ON reddit_posts (created_utc);")
                 log.info("Adding body_fts index")
@@ -67,6 +71,100 @@ class DatabaseManager:
             finally:
                 cur.close()
                 log.info("Connection closed")
+
+    def _generate_vector_query(self,space,threshold=0.55):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large", dimensions=256, show_progress_bar=True, max_retries=5, retry_max_seconds=120)
+        query_embedding = embeddings.embed_query(space)
+        vector_search_query = f"""
+        SELECT similarity, subreddit_name, permalink, created_utc, author, combined_text, body
+        FROM (
+            SELECT 1 - (embeddings <=> '{query_embedding}') AS similarity,
+                subreddit_name, permalink, created_utc, author, combined_text, body
+            FROM reddit_posts
+        ) subquery
+        WHERE similarity > {threshold}
+        ORDER BY similarity DESC
+        LIMIT 100000;
+        """
+        return vector_search_query
+
+    def _generate_fast_vector_query(self,space,threshold=0.55):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large", dimensions=256, show_progress_bar=True, max_retries=5, retry_max_seconds=120)
+        query_embedding = embeddings.embed_query(space)
+        vector_search_query = f"""
+        SET hnsw.ef_search = 1000;
+        SELECT similarity, subreddit_name, permalink, created_utc, author, combined_text, body
+        FROM (
+            SELECT (embeddings <=> '{query_embedding}') AS similarity,
+                subreddit_name, permalink, created_utc, author, combined_text, body
+            FROM reddit_posts
+        ) subquery
+        WHERE similarity < {1-threshold}
+        ORDER BY similarity ASC
+        LIMIT 100000;
+        """
+        return vector_search_query
+    
+    def _generate_keyword_semantic_query(company,space,filter_value=0.10):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large", dimensions=256, show_progress_bar=True, max_retries=5, retry_max_seconds=120)
+        query_embedding = embeddings.embed_query(space)
+        filter_value = filter_value if filter_value else 0.30
+        vector_search_query = query = f"""
+            SELECT (1 - (keyword_filtered.embeddings <=> '{query_embedding}')) AS similarity,subreddit_name, permalink, created_utc, author,combined_text,body
+            FROM (
+                SELECT combined_text, subreddit_name, permalink, body, created_utc, author, embeddings,
+                    (1 - (embeddings <=> '{query_embedding}')) AS similarity
+                FROM reddit_posts
+                WHERE fts @@ phraseto_tsquery('english','{company}')
+                ORDER BY created_utc DESC
+                LIMIT 100000
+            ) AS keyword_filtered
+            WHERE similarity > {filter_value}
+            ORDER BY similarity DESC
+        """
+        return vector_search_query
+    
+    def _generate_keyword_query(company):
+        return f"""
+                SELECT combined_text,subreddit_name, permalink, body,created_utc,author
+                FROM reddit_posts
+                WHERE fts @@ phraseto_tsquery('english','{company}')
+                ORDER BY created_utc DESC
+                LIMIT 100000;
+            """
+    
+    def space_search_query(self,space,fast=True,threshold=0.55):
+        # Define your query
+        sql_query = None
+        if fast:
+            sql_query = self._generate_fast_vector_query(space,threshold)
+        else:
+            sql_query = self._generate_vector_query(space,threshold)
+        try:
+            # Execute the query
+            rows = self.db.execute(text(sql_query)).all()
+            print("Printing rows")
+            result = [row._asdict() for row in rows]
+            return result
+        except Exception as e:
+            log.error(f"Error occurred: {e}")
+            return None
+    
+    def company_keyword_query(self,company,space=None,filter_value=None):
+        # Define your query
+        sql_query = None
+        if space is None:
+            sql_query = self._generate_keyword_query(company)
+        else:
+            sql_query = self._generate_keyword_semantic_query(company,space,filter_value)
+        # Execute the query
+        try:
+            # Execute the query
+            rows = self.db.execute(text(sql_query)).fetchall()
+            return rows
+        except Exception as e:
+            log.error(f"Error occurred: {e}")
+            return None
 
     def insert_subreddit_info(self, subreddit_name):
         retries = 0
@@ -127,29 +225,49 @@ class DatabaseManager:
         except Exception as e:
             log.error(f"Unexpected error inserting subreddit info: {e}")
             return
+    
+    def insert_users(self, authors, batch_size=10000, retries=3):
+            try:
+                author_objects = []
+                for author in tqdm(authors, desc='Fetching authors'):
+                    author_objects.append(RedditUser.get_user_object(author))
+                serialized_author_objects = [user.serialize() for user in author_objects]
 
-    def insert_users(self, authors):
-        try:
-            author_objects = []
-            for author in tqdm(authors, desc='Fetching authors'):
-                author_objects.append(RedditUser.get_user_object(author))
-            serialized_author_objects = [user.serialize() for user in author_objects]
-            stmt = insert(RedditUser).values(serialized_author_objects)
-            stmt = stmt.on_conflict_do_update(
-                index_elements=['username'],
-                set_={
-                    'subreddit_interactions': stmt.excluded.subreddit_interactions,
-                    'extracted_user_info': stmt.excluded.extracted_user_info,
-                    'description': stmt.excluded.description,
-                    'author_flairs': stmt.excluded.author_flairs
-                }
-            )
-            self.db.execute(stmt)
-            self.db.commit()
-        except Exception as e:
-            self.db.rollback()
-            log.error(f"Error occurred: {e}")
-            raise Exception(e)
+                for i in range(0, len(serialized_author_objects), batch_size):
+                    batch = serialized_author_objects[i:i + batch_size]
+                    self._execute_with_retry(batch, retries)
+
+            except Exception as e:
+                self.db.rollback()
+                log.error(f"Error occurred: {e}")
+                raise Exception(e)
+
+    def _execute_with_retry(self, batch, retries):
+        stmt = insert(RedditUser).values(batch)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['username'],
+            set_={
+                'subreddit_interactions': stmt.excluded.subreddit_interactions,
+                'extracted_user_info': stmt.excluded.extracted_user_info,
+                'description': stmt.excluded.description,
+                'author_flairs': stmt.excluded.author_flairs
+            }
+        )
+        for attempt in range(retries):
+            try:
+                self.db.execute(stmt)
+                self.db.commit()
+                return
+            except OperationalError as e:
+                if attempt < retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    raise e
+            except Exception as e:
+                self.db.rollback()
+                log.error(f"Error occurred: {e}")
+                raise Exception(e)
+            
     def close(self):
         self.db.rollback()
         self.db.close()
