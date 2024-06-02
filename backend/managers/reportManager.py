@@ -62,6 +62,7 @@ class ReportManager:
         HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
         },)
         self.openai_small_llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo",max_retries=30)
+        self.openai_big_llm =  ChatOpenAI(temperature=0, model="gpt-4o",max_retries=30)
         self.qa_chain = load_qa_with_sources_chain(self.fast_llm, chain_type="stuff")
         self.gemini_qa_chain = load_qa_with_sources_chain(self.large_json_llm, chain_type="stuff")
         self.space_info = None
@@ -119,7 +120,7 @@ class ReportManager:
         input_dicts = []
         for i in range(0, len(top_documents), batch_size):
             batch = top_documents[i : i + batch_size]
-            prompt = prompt = """You are an entrepreneur researching the pain points users have with {refined_query}. You'll be provided with various Reddit posts related to this topic.
+            prompt = """You are an entrepreneur researching the pain points users have with {refined_query}. You'll be provided with various Reddit posts related to this topic.
         
             Your Goal: Extract a comprehensive list of clear, specific pain points mentioned directly in these posts. Think step by step in getting the pain points. Do not extrapolate on pain points not mentioned. It is ok to give empty outputs if a pain point is not found.
 
@@ -501,7 +502,7 @@ class ReportManager:
             **Example Output (Illustrative, Not Exhaustive):**
 
             ```json
-            [
+            "PainPoints": [
             {{
                 "Pain Point": "Difficulty Navigating Complex Financial Products",
                 "Description": "Users struggle to understand the intricacies of various investment options and financial instruments.",
@@ -575,7 +576,7 @@ class ReportManager:
         ]
         """,
                 "answer": """
-            [
+            "PainPoints": [
                 {{
                     "Pain Point": "Lack of Widespread Adoption and Acceptance of Cryptocurrencies",
                     "Description": "Cryptocurrencies are still not widely accepted as a form of payment, limiting their usefulness as a currency and making it difficult for users to utilize them in everyday transactions.",
@@ -669,7 +670,7 @@ class ReportManager:
         ]
         """,
                 "answer": """
-            [
+            "PainPoints": [
                 {{
                     "Pain Point": "Lack of Widespread Adoption and Acceptance of Cryptocurrencies",
                     "Description": "Cryptocurrencies are still not widely accepted as a form of payment, limiting their usefulness as a currency and making it difficult for users to utilize them in everyday transactions.",
@@ -721,7 +722,7 @@ class ReportManager:
             input_variables=["query"],
             example_separator="\n\n"
         )
-        chain = few_shot_prompt_template | self.large_json_llm | StrOutputParser()
+        chain = few_shot_prompt_template | self.openai_big_llm | StrOutputParser()
 
         # Chain Invoke
         response = chain.invoke({"query": json.dumps(pain_points_json)})
@@ -737,7 +738,7 @@ class ReportManager:
             if self.pain_points is None:
                 pain_points = self._batch_anthropic_space_pain_points(self.top_documents,batch_size)
                 log.info("Pain points extracted")
-                self.pain_points =  json.loads(self._summarize_pain_points(pain_points))
+                self.pain_points =  json.loads(self._summarize_pain_points(pain_points))["PainPoints"]
                 log.info("Pain points summarized")
             if "Percentage" not in self.pain_points[0] and quantify:
                 log.info("Starting quantification of pain points")

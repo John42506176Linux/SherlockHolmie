@@ -143,7 +143,6 @@ class DatabaseManager:
         try:
             # Execute the query
             rows = self.db.execute(text(sql_query)).all()
-            print("Printing rows")
             result = [row._asdict() for row in rows]
             return result
         except Exception as e:
