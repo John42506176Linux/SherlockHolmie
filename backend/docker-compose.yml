@@ -16,7 +16,7 @@ services:
   report-task:
     build:
       context: .
-      dockerfile: ./tasks/painPointTask/Dockerfile
+      dockerfile: ./tasks/reportTask/Dockerfile
     image: report-task
     ports:
       - "5001:80"  # Map host's port 5001 to container's port 80
@@ -24,4 +24,4 @@ services:
       - ./.env
     volumes:
       - ./:/app
-    command: ["uvicorn", "tasks.painPointTask.main:app", "--host", "0.0.0.0", "--port", "80"]
+    command: ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]

@@ -208,3 +208,183 @@ Request:
     }
   ]
 }
+
+## POST `/process_query`
+
+This endpoint processes a given query and space and returns the relevant insights.
+
+### Request Body
+
+The request body should be a JSON object with the following properties:
+
+- `space` (string, required): The space to process.
+- `query` (string, required): The query to process.
+
+Additonal parameters:
+
+- `fast` (bool,optional) : Controls whether the database uses the index or not - Default:True
+- `threshold`(bool,optional): Controls how many posts are analyzed Default: 0.55
+
+### Response
+
+The response is a JSON object with the following properties:
+
+- `Initialization Time` (number): The time taken to initialize the space.
+- `researchInsights` (object): An object containing the insights for this query.
+
+### Example
+
+Request:
+
+```json
+{
+    "space": "Discussions about Cash Advance and Credit Earning",
+    "query" :"How long are people using cash advance type apps for?",
+    "fast": false,
+    "threshold":0.55
+}
+
+{
+  "Initialization Time": 359.93976855278015,
+  "Insights": {
+    "researchInsights": {
+      "attitudinal": [
+        {
+          "insight": "People use cash advance apps for short-term financial needs.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/14n6z2p/cash_advance_apps_for_those_who_get_declined_from/k0vamxn/",
+          "quote": "Cash advance apps can be an option for individuals who have been declined by traditional lenders or face difficulties accessing credit through conventional means.",
+          "date": "2023-09-14T23:33:11Z"
+        },
+        {
+          "insight": "People use cash advance apps to avoid overdraft fees.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/172z8r9/is_it_possible_to_obtain_a_loan_or_cash_advance/k40ujs5/",
+          "quote": "I used them to avoid overdraft fees, because the fees/tips from these apps was less than getting hit with late fees and/or overdraft fees of $34/transaction, max like $102 a day.",
+          "date": "2023-10-08T18:33:00Z"
+        },
+        {
+          "insight": "People use cash advance apps to avoid the hassle of traditional lenders.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/14myzlj/100_short_on_rent/jq6tfnz/",
+          "quote": "I don’t really consider these as bad as “cash advance” places that charge ridiculous interest. I may be wrong.",
+          "date": "2023-06-30T22:12:04Z"
+        },
+        {
+          "insight": "People use cash advance apps because of their speed and reliability.",
+          "source": "https://www.reddit.com/r/poor/comments/19fav29/what_ever_happened_to_the_places_that_look_at/kjkr3to/",
+          "quote": "I’ve been fortunate to use NetPayAdvance when I’ve needed a bigger amount. I usually get the loan for $255 and they are super fast and reliable. Best of all they don’t bug haha. I’ve never been denied from them- especially when I’d been denied other places.",
+          "date": "2024-01-25T23:05:29Z"
+        },
+        {
+          "insight": "People are concerned about getting stuck in a cycle of debt with cash advance apps.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/1b3wvre/please_guys_never_use_cash_advance_apps_if_you/",
+          "quote": "You will get trapped in a borrowing loop BAD. I never thought it would happen to me but one day i needed 50$ i had no money and found Earnin. Thought awesome this is cool ! Borrow 2 weeks early no problem !",
+          "date": "2024-03-01T15:24:13Z"
+        },
+        {
+          "insight": "People are concerned about the high fees and interest rates associated with cash advance apps.",
+          "source": "https://www.reddit.com/r/Money/comments/t4hmb9/possible_loan_app/iepcci8/",
+          "quote": "If you are in need and don't want to go through the process in person, it's useful in down situations. I'd consider all options before doing it. I like it because you can pay back in installments, for example say you are approved for $200 and you have to pay back $250 over the course of 4 payments, 1 payment every 2 weeks. Rather than the other payday loan apps that charge all of the loan on payday.",
+          "date": "2022-07-03T15:02:13Z"
+        },
+        {
+          "insight": "People use cash advance apps because they are seen as a more consumer-friendly alternative to payday loans.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/172z8r9/is_it_possible_to_obtain_a_loan_or_cash_advance/k40o63m/",
+          "quote": "The newer 'cash advance apps' are more consumer friendly (less unfriendly?) than payday loans. You can actually borrow from some of these apps with no interest or fees if you're willing to jump through a few hoops.",
+          "date": "2023-10-08T17:56:07Z"
+        },
+        {
+          "insight": "People are concerned about the impact of cash advance apps on their credit score.",
+          "source": "https://www.reddit.com/r/Money/comments/124kq30/i_need_to_make_some_money_and_i_need_to_make_it/je0mkw8/",
+          "quote": "I might need to use this. Do they affect credit in any way?",
+          "date": "2023-03-28T15:42:50Z"
+        },
+        {
+          "insight": "People are looking for ways to break free from the cycle of using cash advance apps.",
+          "source": "https://www.reddit.com/r/Earnin/comments/18yseqp/need_advice/",
+          "quote": "Has anybody on here been able to break free from the cycle of using payday loan apps. I’ve never been good with saving and one emergency had cause me to delve into not only earnin, but a lot of the other mobile apps. how did you guys break that cycle? i’m trying my best to tackle this before january is over.",
+          "date": "2024-01-05T00:08:03Z"
+        }
+      ],
+      "behavioral": [
+        {
+          "insight": "People use multiple cash advance apps at the same time.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/1bkbyij/any_advice_yall_cash_advance_apps/",
+          "quote": "I use Earnin, Dave, Moneylion and Empower. Any advice would help me y’all, thank you guys!!",
+          "date": "2024-03-21T17:21:29Z"
+        },
+        {
+          "insight": "People use cash advance apps for multiple years.",
+          "source": "https://www.reddit.com/r/Earnin/comments/16qk297/b4b_quick_response/k21s1lt/",
+          "quote": "I've used Dave app for advances for about 4 years now they used to offer a hell of a lot more than what they do now as far as the frequency of offers.",
+          "date": "2023-09-24T21:13:32Z"
+        },
+        {
+          "insight": "People use cash advance apps regularly, often every pay cycle.",
+          "source": "https://www.reddit.com/r/chimefinancial/comments/1cq2oy5/cash_advance_help/l3rr7cj/",
+          "quote": "But I used to use them every pay cycle to help the amount allowed to borrow grow.",
+          "date": "2024-05-12T22:21:09Z"
+        },
+        {
+          "insight": "People use cash advance apps to build up their borrowing limit.",
+          "source": "https://www.reddit.com/r/VaroMoney/comments/1as7azc/advance/kqpyyb5/",
+          "quote": "Ever since I got the app and got the required direct deposit they started me at 20 and over the span of couple months I got to over 200.",
+          "date": "2024-02-16T18:23:56Z"
+        },
+        {
+          "insight": "People use cash advance apps in a pinch, when they need money immediately.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/172z8r9/is_it_possible_to_obtain_a_loan_or_cash_advance/k3zpiig/",
+          "quote": "Ugh, loans and cash advances are such a pain. But yeah, you can probably get $300 pretty quick if you're desperate enough.",
+          "date": "2023-10-08T14:24:03Z"
+        },
+        {
+          "insight": "People use cash advance apps to avoid having to rely on payday loans.",
+          "source": "https://www.reddit.com/r/Money/comments/t4hmb9/possible_loan_app/iepcci8/",
+          "quote": "If you are in need and don't want to go through the process in person, it's useful in down situations. I'd consider all options before doing it. I like it because you can pay back in installments, for example say you are approved for $200 and you have to pay back $250 over the course of 4 payments, 1 payment every 2 weeks. Rather than the other payday loan apps that charge all of the loan on payday.",
+          "date": "2022-07-03T15:02:13Z"
+        },
+        {
+          "insight": "People use cash advance apps to help them budget.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/172z8r9/is_it_possible_to_obtain_a_loan_or_cash_advance/k40ujs5/",
+          "quote": "It’s useful, but always plan your finances to avoid depending on these advances.",
+          "date": "2024-04-17T12:47:37Z"
+        },
+        {
+          "insight": "People use cash advance apps because they are easy to use.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/vcj0cq/is_there_any_way_to_get_a_500_cash_advance_or/kzz99tw/",
+          "quote": "I’ve been using Fund Finance occasionally when the end of the month gets tough. The application is straightforward and approval is quick.",
+          "date": "2024-04-17T12:47:37Z"
+        },
+        {
+          "insight": "People use cash advance apps for a variety of reasons, including emergencies, budgeting, and avoiding overdraft fees.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/172z8r9/is_it_possible_to_obtain_a_loan_or_cash_advance/k40ujs5/",
+          "quote": "Those are the only ones I’ve used regularly. I’ve heard of others but they were either too small of an amount (like $60) or tied to an organization or something.",
+          "date": "2023-10-08T18:33:00Z"
+        },
+        {
+          "insight": "People use cash advance apps as a last resort.",
+          "source": "https://www.reddit.com/r/povertyfinance/comments/14n6z2p/cash_advance_apps_for_those_who_get_declined_from/k0mhik6/",
+          "quote": "However, it's essential to be aware that these loans often come with high fees and interest rates, so they should be used as a last resort.",
+          "date": "2023-09-14T23:33:11Z"
+        }
+      ]
+    },
+    "conclusion": "Based on the attitudinal and behavioral research insights, it is clear that people use cash advance apps primarily for short-term financial needs, such as covering unexpected expenses, avoiding overdraft fees, and bridging the gap between paychecks. Users often rely on these apps for their speed, reliability, and ease of use. However, there are significant concerns about the high fees, potential for getting stuck in a cycle of debt, and the impact on credit scores. While some users have been using these apps for multiple years, others use them regularly, often every pay cycle, and sometimes multiple apps simultaneously. Overall, cash advance apps are seen as a last resort and a temporary solution rather than a long-term financial strategy.",
+    "userSegments": [
+      {
+        "segment": "Short-term Financial Needers",
+        "description": "Users who rely on cash advance apps to cover immediate expenses and bridge the gap between paychecks."
+      },
+      {
+        "segment": "Overdraft Avoiders",
+        "description": "Users who use cash advance apps to avoid overdraft fees and manage their finances more effectively."
+      },
+      {
+        "segment": "Emergency Fund Seekers",
+        "description": "Users who turn to cash advance apps in times of financial emergencies, such as unexpected expenses or urgent bills."
+      },
+      {
+        "segment": "Cycle of Debt Concerned",
+        "description": "Users who are aware of the potential risks of getting stuck in a cycle of debt and are looking for ways to break free from it."
+      }
+    ]
+  }
+}

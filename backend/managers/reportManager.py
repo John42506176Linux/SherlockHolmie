@@ -10,8 +10,9 @@ from langchain_community.document_transformers import (
 )
 from langchain.docstore.document import Document
 from langchain_aws import ChatBedrock
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from constants import  reddit_constants
+from prompts import gemini_prompts,openai_prompts
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from typing import Any
 from uuid import UUID
@@ -19,6 +20,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from utilities.utils import get_json_from_output
 from langchain_core.prompts.few_shot import FewShotPromptTemplate
 from langchain_core.prompts.prompt import PromptTemplate as LangPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import logging.handlers
 from collections import Counter
@@ -55,16 +57,17 @@ class ReportManager:
             model_id="anthropic.claude-3-haiku-20240307-v1:0",
             model_kwargs={"temperature": 0},
         )
-        self.flash_gemini_llm =  ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest",safety_settings={
+        self.flash_gemini_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest",safety_settings={
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_VIOLENCE: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
         },)
         self.openai_small_llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo",max_retries=30)
-        self.openai_big_llm =  ChatOpenAI(temperature=0, model="gpt-4o",max_retries=30)
-        self.qa_chain = load_qa_with_sources_chain(self.fast_llm, chain_type="stuff")
-        self.gemini_qa_chain = load_qa_with_sources_chain(self.large_json_llm, chain_type="stuff")
+        self.openai_big_llm =  ChatOpenAI(temperature=0, model="gpt-4o",max_retries=30).bind(response_format={ "type": "json_object" })
+        self.bedrock_small_qa_chain = load_qa_with_sources_chain(self.fast_llm, chain_type="stuff")
+        self.gemini_pro_json_qa_chain = load_qa_with_sources_chain(self.large_json_llm, chain_type="stuff")
+        self.gemini_flash_qa_chain = load_qa_with_sources_chain(self.flash_gemini_llm, chain_type="stuff")
         self.space_info = None
         self.space = None
         self.top_documents = None
@@ -72,6 +75,81 @@ class ReportManager:
         self.pain_points = None
         self.personas = None
         self.author_texts = None
+        self.query_info =  None
+        self.query = None
+        self.top_query_documents = None
+        self.insights = None
+        self.gemini_prompts = gemini_prompts.GeminiPrompts()
+        self.openai_prompts = openai_prompts.OpenAIPrompts()
+
+    def initialize_query(self,query,space,fast=True,threshold=0.55):
+        if self.query_info is not None:
+            log.error("Query already initialized")
+            return None
+        self.query_info = self.db_manager.space_search_query(query,fast,threshold)
+        self.query = query
+        docs = [
+                Document(
+                    page_content=row['body'],
+                    metadata={
+                        "source": {
+                            'Author': row['author'],
+                            'Link': reddit_constants.REDDIT_URL + row['permalink'],
+                            'Time': row['created_utc']
+                        }
+                    }
+                ) 
+                for row in self.query_info
+            ]
+        reordering = LongContextReorder()
+        self.top_query_documents = reordering.transform_documents(docs)
+        self.top_query_texts = [row['body'] for row in self.query_info]
+        aggregated_data = {}
+        # Iterate through the list and aggregate the text
+        for row in self.query_info:
+            author = row['author']
+            body = row['body']
+            
+            if author  in aggregated_data:
+                aggregated_data[author]['Text'] += 'Post: ' + body + ' \n '
+                aggregated_data[author]['Num_Posts'] += 1
+                
+            else:
+                aggregated_data[author] = {}
+                aggregated_data[author]['Num_Posts'] = 1
+                aggregated_data[author]['Text']  = 'Post: ' + body + ' \n '
+        self.top_query_texts = [data['Text'] for data in aggregated_data.values()]
+        if self.space is None:
+            self.space = space
+
+    def _batch_insights(self,batch_size=50,concurrency=3):
+        input_dicts = []
+
+        prompt =  self.gemini_prompts.get_prompt(name="batch_insight_prompt",refined_query=self.query)
+        for i in range(0, len(self.top_query_documents), batch_size):
+            batch = self.top_query_documents[i : i + batch_size]
+            input_dict = {"question": prompt, "input_documents": batch}
+            input_dicts.append(input_dict)
+        full_insights = []
+        insights = self.gemini_flash_qa_chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
+        for insights_str in insights:
+            full_insights.append(insights_str['output_text'])
+        return full_insights
+    
+    def _summarize_insights(self,insights):
+        prompt = self.openai_prompts.get_prompt(name="summarize_insights_json_prompt",refined_query=self.query,space=self.space)
+        full_insights = ""
+        for insight in insights:
+            full_insights += insight + '\n'
+        template = ChatPromptTemplate.from_messages([
+            ("system", prompt),
+            ("human", "{query}")
+        ])
+        chain = template | self.openai_big_llm | StrOutputParser()
+
+        # Chain Invoke
+        response = chain.invoke({"query": full_insights})
+        return response
 
     def initialize_space(self,space,fast=True,threshold=0.55):
         if self.space_info is not None:
@@ -115,11 +193,14 @@ class ReportManager:
     def get_space_size(self):
         return len(self.space_info)
 
-    def _batch_anthropic_space_pain_points(self,top_documents, batch_size=50,concurrency=3):
+    def get_query_size(self):
+        return len(self.query_info)
+
+    def _batch_anthropic_space_pain_points(self,batch_size=50,concurrency=3):
         all_insights = []  # Collect insights from all batches
         input_dicts = []
-        for i in range(0, len(top_documents), batch_size):
-            batch = top_documents[i : i + batch_size]
+        for i in range(0, len(self.top_documents), batch_size):
+            batch = self.top_documents[i : i + batch_size]
             prompt = """You are an entrepreneur researching the pain points users have with {refined_query}. You'll be provided with various Reddit posts related to this topic.
         
             Your Goal: Extract a comprehensive list of clear, specific pain points mentioned directly in these posts. Think step by step in getting the pain points. Do not extrapolate on pain points not mentioned. It is ok to give empty outputs if a pain point is not found.
@@ -180,7 +261,7 @@ class ReportManager:
             input_dict = {"question": prompt, "input_documents": batch}
             input_dicts.append(input_dict)
 
-        insights = self.qa_chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
+        insights = self.bedrock_small_qa_chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
         for insights_str in insights:
             try:
                 insights = get_json_from_output(insights_str['output_text'])
@@ -400,7 +481,7 @@ class ReportManager:
 
         # Generate insights using the question-answering chain with the top 10 most similar texts as context
 
-        insights = json.loads(self.gemini_qa_chain.run(input_documents=self.top_documents[:1500], question=prompt))["personas"]
+        insights = json.loads(self.gemini_pro_json_qa_chain.run(input_documents=self.top_documents[:1500], question=prompt))["personas"]
         self.personas = insights
         if "Percentage" not in self.personas[0] and quantify:
             log.info("Starting quantification of personas")
@@ -736,7 +817,7 @@ class ReportManager:
         else:
             log.info("Starting pain point extraction")
             if self.pain_points is None:
-                pain_points = self._batch_anthropic_space_pain_points(self.top_documents,batch_size)
+                pain_points = self._batch_anthropic_space_pain_points(batch_size)
                 log.info("Pain points extracted")
                 self.pain_points =  json.loads(self._summarize_pain_points(pain_points))["PainPoints"]
                 log.info("Pain points summarized")
@@ -745,3 +826,17 @@ class ReportManager:
                 self.pain_points = self._quantify_pain_points()
                 log.info("Pain points quantified")
             return self.pain_points
+    
+    def get_insights(self,batch_size=50):
+        if self.query_info is None :
+            raise Exception("Query not initialized")
+        elif batch_size < 1 or batch_size > 200:
+            raise Exception("Batch size must be between 1 and 200")
+        else:
+            log.info("Starting insight extraction")
+            if self.pain_points is None:
+                insights = self._batch_insights(batch_size)
+                log.info("Insights extracted")
+                self.insights =  json.loads(self._summarize_insights(insights))
+                log.info("Insights summarized")
+            return self.insights

@@ -42,3 +42,26 @@ async def process_space(space: str, fast: bool = True, threshold: float = 0.55):
     except Exception as e:
         log.error(f"Error processing space:{e}")
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+@app.post("/process_query")
+async def process_query(query: str, space:str,fast: bool = True, threshold: float = 0.55):
+    start_time = time.time()
+    report_manager = ReportManager(DatabaseManager())
+    log.info("Database Manager created")
+    try:
+        # Initialize space
+        log.info(f"Initializing Space:{query}")
+        report_manager.initialize_query(query=query,space=space,fast=fast,threshold=threshold)
+        log.info(f"Space Size:{report_manager.get_query_size()}")
+
+        # Get insights
+        insights = report_manager.get_insights()
+
+        return {
+            "Initialization Time": time.time() - start_time,
+            "Insights": insights
+        }
+    except Exception as e:
+        log.error(f"Error processing space:{e}")
+        raise HTTPException(status_code=400, detail=str(e))
