@@ -1,0 +1,7 @@
+from typing import Optional
+from pydantic import BaseModel
+
+class SpaceParams(BaseModel):
+    space: str
+    fast: Optional[bool] = True
+    threshold: Optional[float] = 0.55

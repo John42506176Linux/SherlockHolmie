@@ -1,0 +1,8 @@
+aws ecr get-login-password \
+    --region us-east-1 | docker login \
+    --username AWS \
+    --password-stdin 709825985650.dkr.ecr.us-east-1.amazonaws.com
+    
+CONTAINER_IMAGES="709825985650.dkr.ecr.us-east-1.amazonaws.com/weaviate/billing-adapter:1.0.6,709825985650.dkr.ecr.us-east-1.amazonaws.com/weaviate/weaviate:1.24.8"    
+
+for i in $(echo $CONTAINER_IMAGES | sed "s/,/ /g"); do docker pull $i; done

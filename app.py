@@ -15,11 +15,13 @@ from cdk_stacks.database_stack import AuroraServerlessStack
 from cdk_stacks.vpc_stack import VpcStack
 from cdk_stacks.cluster_stack import ClusterStack
 from cdk_stacks.lambda_stack import LambdaStack
+from cdk_stacks.small_db_stack import ReportDBStack
 
 app = cdk.App()
 vpc = VpcStack(app,"SherlockVPC")
 cluster = ClusterStack(app,"ClusterStack",vpc=vpc)
 LambdaStack(app,"LambdaStack",cluster=cluster,vpc=vpc)
 AuroraServerlessStack(app,"DatabaseStack",vpc=vpc)
+ReportDBStack(app,"ReportDBStack",vpc=vpc)
 
 app.synth()
