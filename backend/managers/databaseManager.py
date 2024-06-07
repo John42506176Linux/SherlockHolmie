@@ -28,7 +28,7 @@ db_database = os.getenv('DB_DATABASE')
 
 
 def generate_connection_string(host, port):
-    return f"postgresql://{db_username}:{db_password}@{host}:{port}/{db_database}"
+    return f"postgresql://{db_username}:{db_password}@{host}:{port}/{db_database}?options=-c%20statement_timeout=0"
 
 class DatabaseManager:
     def __init__(self):

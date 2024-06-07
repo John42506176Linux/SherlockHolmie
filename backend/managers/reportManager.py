@@ -481,7 +481,7 @@ class ReportManager:
 
         # Generate insights using the question-answering chain with the top 10 most similar texts as context
 
-        insights = json.loads(self.gemini_pro_json_qa_chain.run(input_documents=self.top_documents[:1500], question=prompt))["personas"]
+        insights = json.loads(self.gemini_pro_json_qa_chain.run(input_documents=self.top_documents[:1000], question=prompt))["personas"]
         self.personas = insights
         if "Percentage" not in self.personas[0] and quantify:
             log.info("Starting quantification of personas")
@@ -803,7 +803,7 @@ class ReportManager:
             input_variables=["query"],
             example_separator="\n\n"
         )
-        chain = few_shot_prompt_template | self.openai_big_llm | StrOutputParser()
+        chain = few_shot_prompt_template | self.large_json_llm | StrOutputParser()
 
         # Chain Invoke
         response = chain.invoke({"query": json.dumps(pain_points_json)})
