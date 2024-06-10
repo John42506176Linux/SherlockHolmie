@@ -306,6 +306,16 @@ class ReportManager:
         # Create the base prompt
         pain_points = "\n".join([f"{index+1}. {item['Pain Point']}" for index, item in enumerate(new_pain_point_summarized)])
 
+        prefix = f"""I have a reddit post/comment and I want to know if the user is expressing one of the following pain points in the following space: {{refined_query}}.
+
+        {pain_points}
+
+
+        Finish Response with <Finish>
+        If they are expressing one or more of the above pain points, respond with the pain point names. If they are not expressing a pain point respond with [None].
+        Respond with a list of pain points. 
+        ALWAYS USE [] even for a single pain point, or None.
+        """
         prefix = prefix.replace("{refined_query}", self.space)
         suffix = """
         User: {query}
@@ -324,7 +334,7 @@ class ReportManager:
             input_variables=["query"],
             example_separator="\n\n"
         )
-        chain = few_shot_prompt_template | self.flash_gemini_llm | StrOutputParser()
+        chain = few_shot_prompt_template | self.openai_small_llm | StrOutputParser()
         input_dicts = [{"query": reddit_post}  for reddit_post in self.top_texts]
         
         insights = chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
