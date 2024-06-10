@@ -24,8 +24,13 @@ def get_json_from_output(input_string):
             if "PainPoints" in json_data:
                 return json_data["PainPoints"]
             else:
-                log.error(f"Errored Json:{json_data}")
-                return None
+                print(f"Errored Json:{json_data}")
+                print("Key 'PainPoints' not found in JSON data.")
+                return {}
         except Exception as e:
-            log.error(f"Failed to decode JSON: {e}")
-    return None
+            print(f"Failed to decode JSON: {e}")
+            print(f"Problematic JSON data: {json_data_str}...")
+            return {}
+    else:
+        print("No JSON data found between <json> tags.")
+    return {}

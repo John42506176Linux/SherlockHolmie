@@ -4,6 +4,8 @@ class OpenAIPrompts:
             "summarize_insights_json_prompt": """
             You are an entrepreneur who wants to ask the following question: {refined_query}
             About the following space: {space}
+            Only give insights on this type of user segment: {user_segment}
+            Please keep in mind the following objective/context when answering the question: {context}
 
             A team of user researchers has collected various insights from Reddit data to help you answer this question. The data is separated into two types:
             - Attitudinal Research: Insights based on what users say
@@ -52,12 +54,8 @@ class OpenAIPrompts:
               "userSegments": [
                 {{
                   "segment": "Segment name goes here",
-                  "description": "Description of this user segment goes here."
+                  "description": "Your description of the segment goes here."
                 }},
-                {{
-                  "segment": "Another segment name goes here",
-                  "description": "Description of another user segment goes here."
-                }}
               ]
             }}
             """
@@ -66,12 +64,16 @@ class OpenAIPrompts:
     def add_prompt(self, name, prompt):
         self.prompts[name] = prompt
 
-    def get_prompt(self, name, refined_query=None, space=None):
+    def get_prompt(self, name, refined_query=None, space=None, user_segment=None, context=None):
         prompt = self.prompts.get(name, "Prompt not found.")
         if refined_query and "{refined_query}" in prompt:
             prompt = prompt.replace("{refined_query}", refined_query)
         if space and "{space}" in prompt:
             prompt = prompt.replace("{space}", space)
+        if user_segment and "{user_segment}" in prompt:
+            prompt = prompt.replace("{user_segment}", user_segment)
+        if context and "{context}" in prompt:
+            prompt = prompt.replace("{context}", context)
         return prompt
 
     def remove_prompt(self, name):

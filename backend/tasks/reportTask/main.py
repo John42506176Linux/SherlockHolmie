@@ -41,7 +41,7 @@ async def process_space(params: SpaceParams):
     try:
         # Initialize space
         log.info(f"Initializing Space:{params.space}")
-        report_manager.initialize_space(params.space,fast=params.fast,threshold=params.threshold)
+        report_manager.initialize_space(params.space,fast=params.fast,threshold=params.threshold, perspective=params.perspective,context=params.context)
         log.info(f"Space Size:{report_manager.get_space_size()}")
 
         # Get pain points
@@ -67,7 +67,7 @@ async def process_query(params: InsightParams):
     try:
         # Initialize space
         log.info(f"Initializing Space:{params.query}")
-        report_manager.initialize_query(query=params.query,space=params.space,fast=params.fast,threshold=params.threshold)
+        report_manager.initialize_query(query=params.query,space=params.space,fast=params.fast,threshold=params.threshold, perspective=params.perspective,context=params.context)
         log.info(f"Space Size:{report_manager.get_query_size()}")
 
         # Get insights

@@ -5,6 +5,9 @@ class GeminiPrompts:
             You are a user researcher who wants to help the company by giving
             information and insights based on the following Reddit data
             that help answer the following query: {refined_query}.
+            Only give insights on this type of user segment: {user_segment}.
+            Please keep in mind the following objective/context given from your superiors when answering the question: {context}.
+
             Separate the insights into two separate types:
             - Attitudinal research: Insights based on what users say
             - Behavioral research: Insights based on what users do
@@ -28,10 +31,14 @@ class GeminiPrompts:
     def add_prompt(self, name, prompt):
         self.prompts[name] = prompt
 
-    def get_prompt(self, name, refined_query=None):
+    def get_prompt(self, name, refined_query=None, user_segment=None, context=None):
         prompt = self.prompts.get(name, "Prompt not found.")
-        if refined_query and "{refined_query}" in prompt:
-            return prompt.format(refined_query=refined_query)
+        if refined_query:
+            prompt = prompt.replace("{refined_query}", refined_query)
+        if user_segment:
+            prompt = prompt.replace("{user_segment}", user_segment)
+        if context:
+            prompt = prompt.replace("{context}", context)
         return prompt
 
     def remove_prompt(self, name):

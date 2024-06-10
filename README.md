@@ -15,6 +15,16 @@ Important Folders
 
  * cdk deploy -  Deploy stack to aws.
  * tasks/deploy.sh - Deploy
+ * Updating Objective - 
+UPDATE "Report"
+SET context = 'New Report Objective'
+WHERE id = 'Report ID';
+ *Updating email - 
+ * Updating email - 
+UPDATE "Report"
+SET email = 'ryan@joinbutler.com'
+WHERE id = '89a9bd5f-2788-42ec-9797-6ad7f13a5aaa';
+ * Updating 
 
 ## How to deploy report generation service locally
  * cd backend

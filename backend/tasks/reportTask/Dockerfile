@@ -13,4 +13,4 @@ RUN pip install -r requirements.txt
 EXPOSE 80
 
 # Run fts_query.py when the container launches
-CMD ["uvicorn", "tasks.painPointTask.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]

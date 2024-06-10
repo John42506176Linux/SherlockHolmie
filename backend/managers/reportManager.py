@@ -12,6 +12,7 @@ from langchain.docstore.document import Document
 from langchain_aws import ChatBedrock
 from langchain_community.chat_models import ChatOpenAI
 from constants import  reddit_constants
+from models.llm_models import PainPointsModel
 from prompts import gemini_prompts,openai_prompts
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from typing import Any
@@ -19,9 +20,9 @@ from uuid import UUID
 from langchain_core.callbacks import BaseCallbackHandler
 from utilities.utils import get_json_from_output
 from langchain_core.prompts.few_shot import FewShotPromptTemplate
-from langchain_core.prompts.prompt import PromptTemplate as LangPromptTemplate
+from langchain_core.prompts.prompt import PromptTemplate
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser,JsonOutputParser
 import logging.handlers
 from collections import Counter
 
@@ -79,14 +80,19 @@ class ReportManager:
         self.query = None
         self.top_query_documents = None
         self.insights = None
+        self.perspective = None
+        self.context = None
         self.gemini_prompts = gemini_prompts.GeminiPrompts()
         self.openai_prompts = openai_prompts.OpenAIPrompts()
+        self.max_retries = 5
 
-    def initialize_query(self,query,space,fast=True,threshold=0.55):
+    def initialize_query(self,query,perspective,space,context,fast=True,threshold=0.55):
         if self.query_info is not None:
             log.error("Query already initialized")
             return None
         self.query_info = self.db_manager.space_search_query(query,fast,threshold)
+        self.perspective = perspective
+        self.context = context
         self.query = query
         docs = [
                 Document(
@@ -125,7 +131,7 @@ class ReportManager:
     def _batch_insights(self,batch_size=50,concurrency=3):
         input_dicts = []
 
-        prompt =  self.gemini_prompts.get_prompt(name="batch_insight_prompt",refined_query=self.query)
+        prompt =  self.gemini_prompts.get_prompt(name="batch_insight_prompt",refined_query=self.query,user_segment=self.perspective,context=self.context)
         for i in range(0, len(self.top_query_documents), batch_size):
             batch = self.top_query_documents[i : i + batch_size]
             input_dict = {"question": prompt, "input_documents": batch}
@@ -137,7 +143,7 @@ class ReportManager:
         return full_insights
     
     def _summarize_insights(self,insights):
-        prompt = self.openai_prompts.get_prompt(name="summarize_insights_json_prompt",refined_query=self.query,space=self.space)
+        prompt = self.openai_prompts.get_prompt(name="summarize_insights_json_prompt",refined_query=self.query,space=self.space,user_segment=self.perspective,context=self.context)
         full_insights = ""
         for insight in insights:
             full_insights += insight + '\n'
@@ -145,13 +151,13 @@ class ReportManager:
             ("system", prompt),
             ("human", "{query}")
         ])
-        chain = template | self.openai_big_llm | StrOutputParser()
+        chain = template | self.large_json_llm | StrOutputParser()
 
         # Chain Invoke
         response = chain.invoke({"query": full_insights})
         return response
 
-    def initialize_space(self,space,fast=True,threshold=0.55):
+    def initialize_space(self,space,perspective,context,fast=True,threshold=0.55):
         if self.space_info is not None:
             log.error("Space already initialized")
             return None
@@ -187,7 +193,8 @@ class ReportManager:
                 aggregated_data[author] = {}
                 aggregated_data[author]['Num_Posts'] = 1
                 aggregated_data[author]['Text']  = 'Post: ' + body + ' \n '
-                
+        self.perspective =  perspective   
+        self.context = context   
         self.author_texts = [data['Text'] for data in aggregated_data.values()]
     
     def get_space_size(self):
@@ -201,19 +208,11 @@ class ReportManager:
         input_dicts = []
         for i in range(0, len(self.top_documents), batch_size):
             batch = self.top_documents[i : i + batch_size]
-            prompt = """You are an entrepreneur researching the pain points users have with {refined_query}. You'll be provided with various Reddit posts related to this topic.
+            prompt = """You are an entrepreneur researching the pain points users have inside the following space: {space}. You'll be provided with various Reddit posts related to this topic.
         
             Your Goal: Extract a comprehensive list of clear, specific pain points mentioned directly in these posts. Think step by step in getting the pain points. Do not extrapolate on pain points not mentioned. It is ok to give empty outputs if a pain point is not found.
-
-            Output Format:
-
-            A JSON list of dictionaries, each containing the following keys:
-            *   **Reasoning(string):** Show how the quote clearly and unambiguously demonstrates the pain point. If it does not, please end the json there. Ensure proper escaping of double quotes (`\"`).
-            *   **PainPoint (string):** The concise, descriptive title of the pain point.
-            *   **Description (string):** A detailed explanation of the pain point, elaborating on its impact and implications.
-            *   **Quote (string):** A verbatim excerpt from the Reddit posts that clearly illustrates the pain point. Ensure proper escaping of double quotes (`\"`).
-            *   **Link (string):** The direct link to the specific comment or post containing the quote, you can only use te same link once.
-            *   **Time (string):** The timestamp of the comment or post. Format: YYYY-MM-DD HH:MM:SS
+            Only choose pain points for the following user segment: {user_segment}.
+            Keep in mind the following objective/context given from your superiors: {context}
 
             Requirements:
 
@@ -234,7 +233,7 @@ class ReportManager:
             *   Relevance is the top priority. If a quote does not strongly and unambiguosly support the pain point, it should not be included.
             *   Specificity, directionality, readability, and accuracy are all important factors in determining the overall quality of each pain point.
 
-        The response format should be JSON enclosed within the following tags: `<json></json>`
+            The response format should be JSON enclosed within the following tags: `<json></json>`
 
             **Here's an example:**
             <json>
@@ -254,11 +253,11 @@ class ReportManager:
             
 
             Your output must be in JSON format only. Any additional input will be penalized.
-
-                """
-                
+            """
             prompt = prompt.replace("{space}", self.space)
-            input_dict = {"question": prompt, "input_documents": batch}
+            prompt = prompt.replace("{user_segment}", self.perspective)
+            prompt = prompt.replace("{context}", self.context)
+            input_dict = {"question": prompt,"input_documents": batch}
             input_dicts.append(input_dict)
 
         insights = self.bedrock_small_qa_chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
@@ -323,7 +322,7 @@ class ReportManager:
         AI: """
 
         # create a prompt example from above template
-        example_prompt = LangPromptTemplate(
+        example_prompt = PromptTemplate(
             input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
         )
 
@@ -335,10 +334,10 @@ class ReportManager:
             input_variables=["query"],
             example_separator="\n\n"
         )
-        chain = few_shot_prompt_template | self.openai_small_llm | StrOutputParser()
+        chain = few_shot_prompt_template | self.flash_gemini_llm | StrOutputParser()
         input_dicts = [{"query": reddit_post}  for reddit_post in self.top_texts]
         
-        insights = chain.batch(input_dicts, stop=["<Finish>"], config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
+        insights = chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
         count_dict = self._count_strings(insights)
         total_pain_point = 0
         log.info(f"Count Dict: {count_dict}")
@@ -347,6 +346,53 @@ class ReportManager:
         for pain_point in self.pain_points:
             pain_point['Percentage'] = round((count_dict[pain_point['Pain Point']] / total_pain_point) * 100, 2)
         return self.pain_points
+    
+    def _output_fix_personas(self,personas,error_message):
+        prompt = """
+        Given the following JSON string generated by an AI, it may contain errors that prevent it from being parsed correctly. Your task is to analyze the string, identify and fix any structural or formatting issues, and return the corrected JSON.
+        You will be given the error message that describes the issue with the JSON string. Your response should include only the corrected JSON string.
+
+        **Guidelines:**
+
+        1. **Prioritize Structural Integrity:** Focus on repairing missing brackets, quotes, commas, and other elements that define the JSON structure.
+        2. **Address Common Errors:** Look for typical mistakes like unescaped quotes within strings, missing colons between keys and values, or extra commas at the end of lists or objects.
+        3. **Preserve Data:** Ensure that the original data within the JSON is not altered or lost during the correction process.
+        4. **Maintain Validity:** Guarantee that the corrected JSON adheres to standard JSON syntax and can be parsed successfully.
+
+        The corrected JSON should adhere to the following format:
+
+        **Example Output:**
+        {{
+        "personas": [
+            {{
+            "persona_title": "The title of the persona. Example: The Newbie Lifter",
+            "persona_reasoning": "Reasoning for why the quote unambiguously connects to the persona.",
+            "description": "This is a description of the persona. Example: New to exercise and weightlifting, often unsure about proper form, intensity, and pain management. May have misconceptions about exercise needing to be painful.",
+            "quote": "This is a quote",
+            "link": "https://www.reddit.com/r/subreddit/comments/comment_id",
+            "latest_quote_time": "2023-12-12",
+            "top_pain_points": [
+                {{
+                "pain_point_title": "This is the title of the pain point",
+                "pain_point_reasoning": "Reasoning for why the quote unambiguously connects to the pain point.",
+                "pain_point_description": "This is the description of the pain point",
+                "pain_point_quote": "This is a quote about a pain point",
+                "pain_point_link": "https://www.reddit.com/r/subreddit/comments/comment_id"
+                }}
+            ]
+            }}
+        ]
+        }}
+
+        **Input:**
+        {query}
+        
+        """
+        example_prompt = PromptTemplate(
+            input_variables=["query","error"], template=prompt
+        )
+        chain = example_prompt | self.openai_big_llm | StrOutputParser()
+        return chain.invoke({"query": json.dumps(personas),"error":error_message})
     
     def get_personas(self,quantify=True):
         if self.space is None:
@@ -358,9 +404,23 @@ class ReportManager:
         if self.personas is not None:
             log.error("Personas already initialized")
             return None
-        prompt = f"""Create concise 3-5 personas for users who relate to the following space -- {self.space} -- based on the given Reddit data.
+        if self.perspective is None:
+            log.error("Perspective not initialized")
+            return None
+        prompt = f"""Create concise 3-5 personas for users who relate to the following space -- {self.space} -- and the following user segments -- {self.perspective} --  based on the given Reddit data.
+        Keep in mind the following objective/context given from your superiors: {self.context}
         Think step by step in the persona creation process.
+
+        Persona Creation Guidelines:
+         - ** TOP PRIORITY: ** Each persona should be directly derived from the Reddit data , have a highly relevant quote,  and should be relevant to the user segment and space.
+         - Each persona should be unique and distinct from the others.
+         - Personas should be based on the user segments and the space.
+         - Personas should differ based on the user's needs, goals, behaviors.
+         - Personas can differ in terms of demographics, culture, background, religion, etc.
+
+
         These personas will be evaluated on:
+        - Relation to the user segment (Personas should fall within the user segment)
         - Relation to the query (Personas should be relevant to the query)
         - Persona Divergence (The personas should not be semantically different from each other in relation to the query)
         - Persona Diversity (The personas should adequately represent the users who relate to the query)
@@ -480,8 +540,32 @@ class ReportManager:
         """
 
         # Generate insights using the question-answering chain with the top 10 most similar texts as context
+        retries = 0
+        insights = None
+        while retries < self.max_retries:
+            response = self.gemini_pro_json_qa_chain.run(input_documents=self.top_documents[:1000], question=prompt)
 
-        insights = json.loads(self.gemini_pro_json_qa_chain.run(input_documents=self.top_documents[:1000], question=prompt))["personas"]
+            try:
+                data = json.loads(response)
+
+                # Check if data is a list and has a dictionary inside 
+                if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                    insights = data  # Safely get "personas" or an empty list
+                else:
+                    insights = data.get("personas", [])  # Standard way to get "personas"
+
+                # Check if insights is empty after previous checks
+                if not insights:
+                    raise ValueError("Personas key is missing or empty")
+                
+                break  # Exit the loop if parsing and validation are successful
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                log.warning(f"Error parsing or validating JSON response: {e}. Retrying...")
+                retries += 1
+                if retries == self.max_retries:
+                    log.error(f"Failed to parse or validate JSON after {self.max_retries} retries.")
+                    log.error(f"Response: {response}")
+                    return None
         self.personas = insights
         if "Percentage" not in self.personas[0] and quantify:
             log.info("Starting quantification of personas")
@@ -511,7 +595,7 @@ class ReportManager:
         User: {query}
         AI: """
         
-        example_prompt = LangPromptTemplate(
+        example_prompt = PromptTemplate(
             input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
         )
 
@@ -526,7 +610,7 @@ class ReportManager:
         chain = few_shot_prompt_template | self.flash_gemini_llm | StrOutputParser()
         input_dicts = [{"query": reddit_post}  for reddit_post in self.author_texts]
         
-        insights = chain.batch(input_dicts, stop=["<Finish>"], config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
+        insights = chain.batch(input_dicts, config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(input_dicts))]})
         count_dict = self._count_strings(insights)
         total_persona = 0
         for persona in self.personas:
@@ -538,6 +622,12 @@ class ReportManager:
     def _summarize_pain_points(self,pain_points_json):
         prefix = """
             You are an entrepreneur seeking to summarize user pain points in the {refined_query} space. You will be provided with a list of JSON objects, each containing a pain point mentioned by users.
+            
+            Focus on the pain points that are most likely to influence user behavior and product development.
+
+            Only use pain points related to the following user segment: {user_segment}.
+
+            Keep in mind the following objective/context given from your superiors: {context}.
 
             **JSON Object Format:**
 
@@ -786,27 +876,47 @@ class ReportManager:
             
         ]
         prefix = prefix.replace("{refined_query}", self.space)
-        suffix = """
-        User: {query}
-        AI: """
+        prefix = prefix.replace("{user_segment}", self.perspective)
+        prefix = prefix.replace("{context}", self.context)
 
         # create a prompt example from above template
-        example_prompt = LangPromptTemplate(
-            input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
+        example_prompt = PromptTemplate(
+            input_variables=["query", "answer"], template="{query}\n{answer}"
         )
 
         few_shot_prompt_template = FewShotPromptTemplate(
             examples=examples,
             example_prompt=example_prompt,
             prefix=prefix,
-            suffix=suffix,
             input_variables=["query"],
             example_separator="\n\n"
         )
-        chain = few_shot_prompt_template | self.large_json_llm | StrOutputParser()
+        chain = few_shot_prompt_template | self.openai_big_llm | StrOutputParser()
 
         # Chain Invoke
+        retries = 0
         response = chain.invoke({"query": json.dumps(pain_points_json)})
+        while retries < self.max_retries:
+            try:
+                response  = json.loads(response)
+                if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict):
+                    insights = response
+                else:
+                    insights = response.get("PainPoints", [])  # Standard way to get "personas"
+
+                # Check if insights is empty after previous checks
+                if not insights:
+                    raise ValueError("Pain Points key is missing or empty")
+                
+                return insights
+            except Exception as e:
+                log.warning(f"Error parsing JSON response: {e}. Retrying...")
+                response 
+                retries += 1
+                if retries == self.max_retries:
+                    log.error(f"Failed to invoke chain after {self.max_retries} retries.")
+                    log.error(f"Response: {response}")
+                    return None
         return response 
 
     def get_pain_points(self,batch_size=50,quantify=True):
@@ -819,7 +929,7 @@ class ReportManager:
             if self.pain_points is None:
                 pain_points = self._batch_anthropic_space_pain_points(batch_size)
                 log.info("Pain points extracted")
-                self.pain_points =  json.loads(self._summarize_pain_points(pain_points))["PainPoints"]
+                self.pain_points =  self._summarize_pain_points(pain_points)
                 log.info("Pain points summarized")
             if "Percentage" not in self.pain_points[0] and quantify:
                 log.info("Starting quantification of pain points")
