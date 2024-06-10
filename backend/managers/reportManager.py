@@ -317,10 +317,6 @@ class ReportManager:
         ALWAYS USE [] even for a single pain point, or None.
         """
         prefix = prefix.replace("{refined_query}", self.space)
-        suffix = """
-        User: {query}
-        AI: """
-
         # create a prompt example from above template
         example_prompt = PromptTemplate(
             input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
@@ -330,7 +326,6 @@ class ReportManager:
             examples=examples,
             example_prompt=example_prompt,
             prefix=prefix,
-            suffix=suffix,
             input_variables=["query"],
             example_separator="\n\n"
         )
@@ -591,9 +586,6 @@ class ReportManager:
         """
 
         prefix = prefix.replace("{refined_query}", self.space)
-        suffix = """
-        User: {query}
-        AI: """
         
         example_prompt = PromptTemplate(
             input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
@@ -603,7 +595,6 @@ class ReportManager:
             examples=examples,
             example_prompt=example_prompt,
             prefix=prefix,
-            suffix=suffix,
             input_variables=["query"],
             example_separator="\n\n"
         )
