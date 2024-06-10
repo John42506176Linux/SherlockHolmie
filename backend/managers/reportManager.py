@@ -306,17 +306,11 @@ class ReportManager:
         # Create the base prompt
         pain_points = "\n".join([f"{index+1}. {item['Pain Point']}" for index, item in enumerate(new_pain_point_summarized)])
 
-        prefix = f"""I have a reddit post/comment and I want to know if the user is expressing one of the following pain points in the following space: {{refined_query}}.
-
-        {pain_points}
-
-
-        Finish Response with <Finish>
-        If they are expressing one or more of the above pain points, respond with the pain point names. If they are not expressing a pain point respond with [None].
-        Respond with a list of pain points. 
-        ALWAYS USE [] even for a single pain point, or None.
-        """
         prefix = prefix.replace("{refined_query}", self.space)
+        suffix = """
+        User: {query}
+        AI: """
+
         # create a prompt example from above template
         example_prompt = PromptTemplate(
             input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
@@ -326,6 +320,7 @@ class ReportManager:
             examples=examples,
             example_prompt=example_prompt,
             prefix=prefix,
+            suffix=suffix,
             input_variables=["query"],
             example_separator="\n\n"
         )
@@ -587,6 +582,10 @@ class ReportManager:
 
         prefix = prefix.replace("{refined_query}", self.space)
         
+        suffix = """
+        User: {query}
+        AI: """
+        
         example_prompt = PromptTemplate(
             input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
         )
@@ -595,6 +594,7 @@ class ReportManager:
             examples=examples,
             example_prompt=example_prompt,
             prefix=prefix,
+            suffix=suffix,
             input_variables=["query"],
             example_separator="\n\n"
         )
@@ -870,19 +870,24 @@ class ReportManager:
         prefix = prefix.replace("{user_segment}", self.perspective)
         prefix = prefix.replace("{context}", self.context)
 
+        suffix = """
+        User: {query}
+        AI: """
+
         # create a prompt example from above template
         example_prompt = PromptTemplate(
-            input_variables=["query", "answer"], template="{query}\n{answer}"
+            input_variables=["query", "answer"], template="User: {query}\nAI: {answer}"
         )
 
         few_shot_prompt_template = FewShotPromptTemplate(
             examples=examples,
             example_prompt=example_prompt,
             prefix=prefix,
+            suffix=suffix,
             input_variables=["query"],
             example_separator="\n\n"
         )
-        chain = few_shot_prompt_template | self.openai_big_llm | StrOutputParser()
+        chain = few_shot_prompt_template | self.large_json_llm | StrOutputParser()
 
         # Chain Invoke
         retries = 0
