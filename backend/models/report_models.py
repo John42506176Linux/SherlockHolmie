@@ -1,13 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean,Table,Float
+from sqlalchemy import  Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship, Mapped, mapped_column,declarative_base
-from sqlalchemy.dialects.postgresql import JSONB
-from pgvector.sqlalchemy import Vector
 import datetime
-from typing import List
-import requests
-from downloaders.redditDownloader import user_agents
-import time
-import random
 import logging.handlers
 
 log = logging.getLogger("bot")
@@ -43,6 +36,13 @@ class Report(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     space: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=True)
+    email: Mapped[str] = mapped_column(String, nullable=True)
+    objective: Mapped[str] = mapped_column(String, nullable=True)
+    perspective: Mapped[str] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default='processing')
+
+    created_at: Mapped[DateTime] = mapped_column(DateTime, default=datetime.datetime.now(DateTime.timezone.utc))
 
     personas: Mapped[list["Persona"]] = relationship('Persona', back_populates='report', cascade='all, delete-orphan')
     insights: Mapped[list["Insight"]] = relationship('Insight', back_populates='report', cascade='all, delete-orphan')

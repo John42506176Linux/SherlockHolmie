@@ -21,7 +21,7 @@ db_database = os.getenv('SMALL_DB_DATABASE')
 def generate_connection_string(host, port):
     return f"postgresql://{db_username}:{db_password}@{host}:{port}/{db_database}"
 
-class DatabaseManager:
+class ReportDatabaseManager:
     def __init__(self):
         self.connection_string = ""
         if os.getenv('ENV') != 'PROD':
@@ -41,6 +41,23 @@ class DatabaseManager:
             log.info("Create db call")
             Base.metadata.create_all(self.engine, checkfirst=True)
             log.info("Meta data created")
+    
+    def insert_report(self, space: str,objective: str,perspective:str, name: str, email: str):
+        try:
+            report = Report(
+                space=space,
+                name=name,
+                email=email,
+                objective=objective,
+                perspective=perspective
+            )
+            self.db.add(report)
+            self.db.commit()
+            return report.id
+        except IntegrityError as e:
+            self.db.rollback()
+            log.error(f"Error inserting report: {e}")
+            return None
             
     def close(self):
         self.db.rollback()

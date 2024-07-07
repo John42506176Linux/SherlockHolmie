@@ -31,7 +31,7 @@ load_dotenv()
 
 @app.get("/")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "Everything is fine"}
 
 @app.post("/process_space")
 async def process_space(params: SpaceParams):
@@ -44,10 +44,11 @@ async def process_space(params: SpaceParams):
         report_manager.initialize_space(params.space,fast=params.fast,threshold=params.threshold, perspective=params.perspective,context=params.context)
         log.info(f"Space Size:{report_manager.get_space_size()}")
 
-        # Get pain points
-        pain_points = report_manager.get_pain_points(batch_size=params.batch_size)
         # Get personas
-        personas = report_manager.get_personas(quantify=True)
+        personas = report_manager.get_personas(concurrency=params.concurrency,batch_size=params.batch_size)
+
+        # Get pain points
+        pain_points = report_manager.get_pain_points(concurrency=params.concurrency,batch_size=params.batch_size)
 
         return {
             "Initialization Time": time.time() - start_time,

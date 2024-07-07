@@ -34,3 +34,48 @@ def get_json_from_output(input_string):
     else:
         print("No JSON data found between <json> tags.")
     return {}
+
+def extract_post_title_from_permalink(permalink):
+    # Use regular expression to extract the descriptive part of the title
+    match = re.search(r'/comments/[^/]+/([^/]+)/', permalink)
+    if match:
+        # Replace underscores with spaces
+        title_with_spaces = match.group(1).replace('_', ' ')
+        return title_with_spaces
+    return None
+
+EMOTION_VALUES = {
+    "Joy": 1.0,
+    "Trust": 0.8,
+    "Gratitude": 0.8,
+    "Excitement": 0.8,
+    "Admiration": 0.7,
+    "Relief": 0.7,
+    "Satisfaction": 0.7,
+    "Hope": 0.6,
+    "Optimism": 0.6,
+    "Pride": 0.6,
+    "Curiosity": 0.5,
+    "Anticipation": 0.5,
+    "Sympathy": 0.4,
+    "Surprise": 0.4,
+    "Neutral": 0.0,
+    "Concern": -0.3,
+    "Skepticism": -0.4,
+    "Confusion": -0.4,
+    "Embarrassment": -0.4,
+    "Apprehension": -0.5,
+    "Frustration": -0.5,
+    "Envy": -0.5,
+    "Wariness": -0.3,
+    "Sadness": -0.5,
+    "Worry": -0.3,
+    "Disappointment": -0.6,
+    "Boredom": -0.3,
+    "Resentment": -0.7,
+    "Distrust": -0.7,
+    "Anxiety": -0.3,
+    "Fear": -0.8,
+    "Disgust": -0.9,
+    "Anger": -0.9
+}

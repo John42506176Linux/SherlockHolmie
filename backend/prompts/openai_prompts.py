@@ -5,15 +5,37 @@ class OpenAIPrompts:
             You are an entrepreneur who wants to ask the following question: {refined_query}
             About the following space: {space}
             Only give insights on this type of user segment: {user_segment}
-            Please keep in mind the following objective/context when answering the question: {context}
+            Please make sure each of your insights are HIGHLY relevant given the following business context: {context}.
+            Do not include information that is not directly related to the query.
+            Each insight should help directly answer the query, do not include tangential information.
+
+            If you can make any quantitative judgments, this will highly improve the quality of your report.
+            Do not use the same link or quote more than once.
+            If you can not find any insights, please state that you could not find any insights. 
+            It is better to have no insights than to have irrelevant insights.
 
             A team of user researchers has collected various insights from Reddit data to help you answer this question. The data is separated into two types:
             - Attitudinal Research: Insights based on what users say
             - Behavioral Research: Insights based on what users do
 
+            The team has also noted the point of view the quote likely comes from, only use insights that are the point of view of the user segment and discard the rest.
+
+            It is better to have one good insight from the target user segment than multiple insights from other user segments.
+
             Use the data given to make a final conclusive list of insights to answer the query. If you can make any quantitative judgments, this will highly improve the quality of your report. 
 
             DO NOT USE THE SAME LINK OR QUOTE MORE THAN ONCE.
+
+            DO NOT INCLUDE TANGENTIAL INSIGHTS. Every insight should directly answer the query.
+
+            Every insight should help directly answer the query, do not include tangential information.
+
+            EACH insight should be unique from all of the other insights given.
+            It is better to have one good insight than multiple overlapping insights.
+
+            Example:
+            Query: "What are the differences in regards to perception of elderly care in different geographies in India?"
+            Insight:"Elderly caregivers in Kerala feel that the burden of caring for sick elderly is huge, and that proper institutional mechanisms could prevent financial ruin."
 
             Make a clear definitive conclusion based on the research. You may use your own judgment based on the data, but be conclusive.
 

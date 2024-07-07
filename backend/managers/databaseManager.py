@@ -76,15 +76,15 @@ class DatabaseManager:
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large", dimensions=256, show_progress_bar=True, max_retries=5, retry_max_seconds=120)
         query_embedding = embeddings.embed_query(space)
         vector_search_query = f"""
-        SELECT similarity, subreddit_name, permalink, created_utc, author, combined_text, body
+        SELECT similarity, subreddit_name, permalink, created_utc, author, combined_text, body,is_post,score,archived,id
         FROM (
             SELECT 1 - (embeddings <=> '{query_embedding}') AS similarity,
-                subreddit_name, permalink, created_utc, author, combined_text, body
+                subreddit_name, permalink, created_utc, author, combined_text, body,is_post,score,archived,id
             FROM reddit_posts
         ) subquery
         WHERE similarity > {threshold}
         ORDER BY similarity DESC
-        LIMIT 100000;
+        LIMIT 200000;
         """
         return vector_search_query
 
@@ -93,10 +93,10 @@ class DatabaseManager:
         query_embedding = embeddings.embed_query(space)
         vector_search_query = f"""
         SET hnsw.ef_search = 1000;
-        SELECT similarity, subreddit_name, permalink, created_utc, author, combined_text, body
+        SELECT similarity, subreddit_name, permalink, created_utc, author, combined_text, body,is_post,score,archived,id
         FROM (
             SELECT (embeddings <=> '{query_embedding}') AS similarity,
-                subreddit_name, permalink, created_utc, author, combined_text, body
+                subreddit_name, permalink, created_utc, author, combined_text, body,is_post,score,archived,id
             FROM reddit_posts
         ) subquery
         WHERE similarity < {1-threshold}
@@ -110,9 +110,9 @@ class DatabaseManager:
         query_embedding = embeddings.embed_query(space)
         filter_value = filter_value if filter_value else 0.30
         vector_search_query = query = f"""
-            SELECT (1 - (keyword_filtered.embeddings <=> '{query_embedding}')) AS similarity,subreddit_name, permalink, created_utc, author,combined_text,body
+            SELECT (1 - (keyword_filtered.embeddings <=> '{query_embedding}')) AS similarity,subreddit_name, permalink, created_utc, author,combined_text,body,is_post,score,archived
             FROM (
-                SELECT combined_text, subreddit_name, permalink, body, created_utc, author, embeddings,
+                SELECT combined_text, subreddit_name, permalink, body, created_utc, author, embeddings,is_post,score,archived
                     (1 - (embeddings <=> '{query_embedding}')) AS similarity
                 FROM reddit_posts
                 WHERE fts @@ phraseto_tsquery('english','{company}')
@@ -126,7 +126,7 @@ class DatabaseManager:
     
     def _generate_keyword_query(company):
         return f"""
-                SELECT combined_text,subreddit_name, permalink, body,created_utc,author
+                SELECT combined_text,subreddit_name, permalink, body,created_utc,author,is_post,score,archived
                 FROM reddit_posts
                 WHERE fts @@ phraseto_tsquery('english','{company}')
                 ORDER BY created_utc DESC
