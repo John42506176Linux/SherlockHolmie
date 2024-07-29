@@ -1,17 +1,17 @@
 version: '3.8'
 services:
-  reddit-etl-task:
-    build:
-      context: .
-      dockerfile: ./tasks/redditETLTask/Dockerfile
-    image: reddit-etl-task
-    ports:
-      - "5000:5000"
-    env_file:
-      - ./.env
-    volumes:
-      - ./scripts:/scripts
-      - ./files:/files
+  # reddit-etl-task:
+  #   build:
+  #     context: .
+  #     dockerfile: ./tasks/redditETLTask/Dockerfile
+  #   image: reddit-etl-task
+  #   ports:
+  #     - "5000:5000"
+  #   env_file:
+  #     - ./.env
+  #   volumes:
+  #     - ./scripts:/scripts
+  #     - ./files:/files
 
   report-task:
     build:
@@ -24,4 +24,23 @@ services:
       - ./.env
     volumes:
       - ./:/app
-    command: ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80", "--reload"]
+    command: ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: ./tasks/reportTask/Dockerfile  # Use the same Dockerfile as report-task
+    image: celery-worker
+    env_file:
+      - ./.env
+    volumes:
+      - ./:/app
+
+    command: celery -A managers.celeryManager worker --loglevel=info --concurrency=1  # Adjust the module path as needed
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"

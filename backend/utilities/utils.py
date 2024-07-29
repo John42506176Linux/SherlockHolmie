@@ -12,6 +12,20 @@ def escape_quotes_in_json(json_string):
     escaped_string = re.sub(r'(?<!\\)"', r'\"', json_string)
     return escaped_string
 
+def extract_post_slug(url):
+    # Define the regex pattern to extract the post slug
+    pattern = re.compile(r'/r/[^/]+/comments/[^/]+/([^/]+)/')
+    match = pattern.search(url)
+
+    if match:
+        title = match.group(1)
+        title = re.sub(r'[_-]', ' ', title)
+        # Remove any file extensions (like .html)
+        title = re.sub(r'\.\w+$', '', title)
+        return title.title()
+    else:
+        return None
+
 def get_json_from_output(input_string):
     # Extract JSON data between <json> tags
     json_data_match = re.search(r'<json>(.*?)</json>', input_string, re.DOTALL)

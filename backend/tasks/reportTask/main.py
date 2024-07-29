@@ -1,12 +1,9 @@
-from fastapi import FastAPI, HTTPException
-import logging.handlers
-from dotenv import load_dotenv
-import time
-from managers.databaseManager import DatabaseManager
-from managers.reportManager import ReportManager
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+from celery.result import AsyncResult
+from managers.celeryManager import process_space_task,app as celery_app
 from request_params.space_params import SpaceParams
-from request_params.insight_params import InsightParams
 
 app = FastAPI()
 
@@ -23,10 +20,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-   
 )
-
-load_dotenv()
 
 
 @app.get("/")
@@ -35,50 +29,26 @@ async def health_check():
 
 @app.post("/process_space")
 async def process_space(params: SpaceParams):
-    start_time = time.time()
-    report_manager = ReportManager(DatabaseManager())
-    log.info("Database Manager created")
-    try:
-        # Initialize space
-        log.info(f"Initializing Space:{params.space}")
-        report_manager.initialize_space(params.space,fast=params.fast,threshold=params.threshold, perspective=params.perspective,context=params.context)
-        log.info(f"Space Size:{report_manager.get_space_size()}")
+    task_id = process_space_task.delay(params.dict())
+    print(f"Hi I'm here:{task_id}")
+    return {"status": "Report generation has started. Please wait...","success":True} 
 
-        # Get personas
-        personas = report_manager.get_personas(concurrency=params.concurrency,batch_size=params.batch_size)
-
-        # Get pain points
-        pain_points = report_manager.get_pain_points(concurrency=params.concurrency,batch_size=params.batch_size)
-
-        return {
-            "Initialization Time": time.time() - start_time,
-            "Pain Points": pain_points,
-            "Personas": personas
+@app.get("/task_status/{task_id}")
+async def get_task_status(task_id: str):
+    task_result = AsyncResult(task_id, app=celery_app)
+    if task_result.state == 'PENDING':
+        response =  {
+            "state": task_result.state,
+            "status": "Task is pending..."
         }
-    except Exception as e:
-        log.error(f"Error processing space:{e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/process_insights")
-async def process_query(params: InsightParams):
-    start_time = time.time()
-    report_manager = ReportManager(DatabaseManager())
-    log.info("Database Manager created")
-    try:
-        # Initialize space
-        log.info(f"Initializing Space:{params.query}")
-        report_manager.initialize_query(query=params.query,space=params.space,fast=params.fast,threshold=params.threshold, perspective=params.perspective,context=params.context)
-        log.info(f"Space Size:{report_manager.get_query_size()}")
-
-        # Get insights
-        insights = report_manager.get_insights(batch_size=params.batch_size)
-
-        return {
-            "Initialization Time": time.time() - start_time,
-            "query": params.query,
-            "Insights": insights
+    elif task_result.state != 'FAILURE':
+        response = {
+            "state": task_result.state,
+            "status": task_result.info,
         }
-    except Exception as e:
-        log.error(f"Error processing space:{e}")
-        raise HTTPException(status_code=400, detail=str(e))
+    else:
+        response = {
+            "state": task_result.state,
+            "status": str(task_result.info),  # this is the exception raised
+        }
+    return response

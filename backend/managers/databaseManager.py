@@ -15,6 +15,9 @@ import random
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
 from langchain_openai import OpenAIEmbeddings
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import psycopg2
+from psycopg2 import sql
 
 
 log = logging.getLogger("bot")
@@ -28,7 +31,7 @@ db_database = os.getenv('DB_DATABASE')
 
 
 def generate_connection_string(host, port):
-    return f"postgresql://{db_username}:{db_password}@{host}:{port}/{db_database}?options=-c%20statement_timeout=0"
+    return f"postgresql://{db_username}:{db_password}@{host}:{port}/{db_database}"
 
 class DatabaseManager:
     def __init__(self):
@@ -66,12 +69,13 @@ class DatabaseManager:
                 log.info("Committing changes")
                 cur.commit()
             except Exception as e:
-                log.error(f"Error occurred: {e}")
+                log.error(f"Error occurred Initializing Database: {e}")
                 cur.rollback()
             finally:
                 cur.close()
                 log.info("Connection closed")
 
+    
     def _generate_vector_query(self,space,threshold=0.55):
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large", dimensions=256, show_progress_bar=True, max_retries=5, retry_max_seconds=120)
         query_embedding = embeddings.embed_query(space)
@@ -84,7 +88,7 @@ class DatabaseManager:
         ) subquery
         WHERE similarity > {threshold}
         ORDER BY similarity DESC
-        LIMIT 200000;
+        LIMIT 50000;
         """
         return vector_search_query
 
@@ -100,8 +104,8 @@ class DatabaseManager:
             FROM reddit_posts
         ) subquery
         WHERE similarity < {1-threshold}
-        ORDER BY similarity ASC
-        LIMIT 100000;
+        ORDER BY similarity DESC
+        LIMIT 10000;
         """
         return vector_search_query
     
@@ -133,22 +137,52 @@ class DatabaseManager:
                 LIMIT 100000;
             """
     
-    def space_search_query(self,space,fast=True,threshold=0.55):
-        # Define your query
-        sql_query = None
-        if fast:
-            sql_query = self._generate_fast_vector_query(space,threshold)
-        else:
-            sql_query = self._generate_vector_query(space,threshold)
-        try:
-            # Execute the query
-            rows = self.db.execute(text(sql_query)).all()
-            result = [row._asdict() for row in rows]
-            return result
-        except Exception as e:
-            log.error(f"Error occurred: {e}")
-            return None
+    def space_search_query(self,space,threshold=0.55):
+        with psycopg2.connect(self.connection_string, options="-c statement_timeout=0") as conn:
+            with conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor) as cur:
+                log.info("Connected")
+                # Define your query
+                sql_query = self._generate_vector_query(space,threshold)
+                query = sql.SQL(sql_query)
+                start_time=time.time()
+
+                # Execute the query
+                cur.execute(query)
+                log.info("Executed")
+                log.info(f"Execute Time:{time.time()-start_time}")
+                # Fetch all the rows
+                rows = cur.fetchall()
+                log.info(len(rows))
+                return rows
     
+    def search_multiple_queries(self,queries, hyde_docs,  threshold=0.55):
+        def execute_query(hyde_doc, query):
+            result = self.space_search_query(hyde_doc, threshold)
+            return result, query
+
+        results = {}
+        
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_query = {executor.submit(execute_query, hyde_doc, query): query 
+                            for hyde_doc, query in zip(hyde_docs, queries)}
+            
+            for future in as_completed(future_to_query):
+                try:
+                    rows, query = future.result()
+                    for row in rows:
+                        item_id = row['id']
+                        if item_id not in results or row['similarity'] > results[item_id]['similarity']:
+                            results[item_id] = row
+                            results[item_id]['best_query'] = query
+                except Exception as e:
+                    log.error(f"Error with query {future_to_query[future]}: {e}")
+                    
+
+        # Convert the dictionary to a list and sort by similarity in descending order
+        sorted_results = sorted(results.values(), key=lambda x: x['similarity'], reverse=False)
+        
+        return sorted_results
+
     def company_keyword_query(self,company,space=None,filter_value=None):
         # Define your query
         sql_query = None
@@ -238,7 +272,7 @@ class DatabaseManager:
 
             except Exception as e:
                 self.db.rollback()
-                log.error(f"Error occurred: {e}")
+                log.error(f"Error occurred Inserting Users Into Databse: {e}")
                 raise Exception(e)
 
     def _execute_with_retry(self, batch, retries):

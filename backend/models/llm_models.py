@@ -123,16 +123,13 @@ class PainPoint(BaseModel):
     issue: Topic_Issue = Field(description="The individual specific area of concern for this pain point. More specific issues are more valuable here. Specific processes or services unique to this space will be especially valued")
     issue_emotion:EmotionType  = Field(description="The type of emotion the user has towards the given issue topic. Only use the emotions given.  Choose other if there is no matching emotion.")
     description: str = Field(description="A description of the pain point.")
-    title: str = Field(description="The title should ALWAYS start with a directional word  based on the issue emotion(Lack of, Diffuculty with, Seeking), the issue, and the topic. ")
-    link: str = Field(description="Link to the quote in the given data.")
-    time: str = Field(description="The time of the quote in the given data.")
-    score: float = Field(description="The number of upvotes minus the number of downvotes for this comment.")
-    author: str = Field(description="The author of the quote.")
+    title: str = Field(description="The title should ALWAYS start with a directional word  based on the the type of issue(Lack of, Diffuculty with, Seeking), the issue, and the topic. ")
     post_id: str = Field(description="The id of the post")
-
+    persona: Optional[str] = Field(description="The persona this pain point falls in to. Enter null if it's unclear.")
+    
 class Persona(BaseModel):
     chain_of_thought_pick_persona: str = Field(
-        description="A chain of thought explaining step by step how this persona was chosen, how it fits the exact perspective given and the space, how the quote directly shows the persona and how the persona. You must show that this persona directly matches the space and perspective and relates directly to the quote. If you are unsure, say it is not relevant. If you determine this is not a relevant persona or the quote is irrelevant that's ok, just don't hallucinate. Finish with a definitive conclusion whether this is a relevant specific persona that matches the quote."
+        description="A chain of thought explaining step by step how this persona was chosen, how it fits the exact perspective given and the space, how the quote directly shows the persona and how the persona. You must show that this persona directly matches the exact space and exact perspective and relates directly to the quote. If you are unsure, say it is not relevant. If you determine this is not a relevant persona or the quote is irrelevant that's ok, just don't hallucinate. Finish with a definitive conclusion whether this is a relevant specific persona that matches the quote. You must explicity conclude whether this persona is an exact match for the given perspective."
     )
     quote: str = Field(
         description="A representative quote that exemplifies this persona's perspective or typical statement"
@@ -146,21 +143,6 @@ class Persona(BaseModel):
     post_id: str = Field(description="The id of the post")
     description: str = Field(
         description="A detailed description of the persona, including their characteristics, background, and typical behavior"
-    )
-    link: str = Field(
-        description="The URL link to the source of the quote"
-    )
-    chain_of_thought_occupation:str=Field(
-        descriptin="A chain of thought explaining step by step how this user definitely has this occupation, with a part of the quote proving this. If you cannot prove any explicit occupation is ok, just don't hallucinate.You must make a conclusion either stating the occupation of the user, or say none can be found."
-    )
-    occupation: Optional[str] = Field(
-        description="The occupation of the persona. Only add this if you have conclusively proven the occupation of the author of the quote. Do not extrapolate, based on mentions only enter this if the user has explicitly stated their occupation."
-    )
-    age: Optional[int] = Field(
-        description="The age of the persona, this is required if it was given in the user perspective."
-    )
-    location: Optional[str] = Field(
-        description="The location of the persona,this is required if it was given in the user perspective."
     )
 
 class PersonaResponse(BaseModel):
@@ -191,6 +173,7 @@ class PainPointClusterItem(BaseModel):
     score:int  = Field(description="The score of the post/comment of the post.")
     time:str = Field(description="The time of quote")
     link:str = Field(description="The link to the quote")
+    persona:Optional[str] = Field(description="The assigned persona of the pain point")
         
 class PainPointCluster(BaseModel):
     title: str = Field(description="Concise pain point title (3-7 words)")
@@ -232,3 +215,16 @@ class PersonaCluster(BaseModel):
     description: str = Field(description="Brief description of the persona (1-4 sentences)")
     percentage:float = Field(descripiton="The percentage of cluster items under this")
     sub_personas: List[PersonaClusterItem] = Field(description="A list of the sub personas for this cluster")
+    top_pain_points: List[PainPointCluster] = Field(description="A list of the top pain points for this cluster")
+
+class RedditPostAnalysis(BaseModel):
+    space_match_reasoning:str = Field(description="Think step by step if this post truly matches the given space.")
+    space_match: bool = Field(description="Whether the post is relevant to the given space")
+    perspective_match_reasoning:str = Field(description="Think step by step if this post's author is the given perspective .")
+    perspective_match: bool = Field(description="Whether the user writing this post is the given perspective.")
+
+class QueryList(BaseModel):
+    query: List[str] = Field(description="List of alternate queries")
+
+class HydeResp(BaseModel):
+    hyde: str = Field(description="A hypothetical post that answers the query.")
