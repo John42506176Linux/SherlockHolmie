@@ -28,7 +28,7 @@ services:
     command: [
         "sh", 
         "-c", 
-        "echo 'Contents of /app:' && ls -R /app && echo 'Starting uvicorn' && uvicorn tasks.reportTask.main:app --host 0.0.0.0 --port 80"
+        "echo 'Contents of .:' && ls -R . && echo 'Starting uvicorn' && uvicorn tasks.reportTask.main:app --host 0.0.0.0 --port 80"
     ]
 
   celery-worker:
@@ -41,7 +41,7 @@ services:
     volumes:
       - ./:/app
 
-    command: ["sh", "-c", "ls -R /app && export PYTHONPATH=/app && celery -A managers.celeryManager worker --loglevel=info --concurrency=1"]
+    command: ["sh", "-c", "ls -R . && celery -A managers.celeryManager worker --loglevel=info --concurrency=1"]
     depends_on:
       - redis
 

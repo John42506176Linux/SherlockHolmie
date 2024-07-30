@@ -11,7 +11,7 @@ REPOSITORY_NAME="sherlockholmie-celery"
 ECR_URL="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPOSITORY_NAME}:${IMAGE_VERSION}"
 
 # Build the image using docker-compose
-docker-compose build celery-worker
+# docker-compose build celery-worker
 
 # Tag the image
 docker tag ${IMAGE_NAME} ${ECR_URL}

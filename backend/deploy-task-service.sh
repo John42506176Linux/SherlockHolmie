@@ -11,13 +11,13 @@ REPOSITORY_NAME="sherlockholmie-report"
 ECR_URL="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPOSITORY_NAME}:${IMAGE_VERSION}"
 
 # Build the image using docker-compose
-docker-compose build report-task
+# docker-compose build report-task
 
 # Tag the image
 docker tag ${IMAGE_NAME} ${ECR_URL}
 
 # Authenticate to ECR
-aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
+aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin 791346673593.dkr.ecr.${REGION}.amazonaws.com
 
 # Push the image to ECR
 docker push ${ECR_URL}
