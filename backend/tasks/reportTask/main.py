@@ -13,6 +13,7 @@ log.addHandler(logging.StreamHandler())
 
 origins = [
     "http://localhost:3000",  # Replace with your actual origin
+    "https://app.sherlockhomie.com" 
 ]
 
 app.add_middleware(

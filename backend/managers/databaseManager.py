@@ -88,7 +88,7 @@ class DatabaseManager:
         ) subquery
         WHERE similarity > {threshold}
         ORDER BY similarity DESC
-        LIMIT 50000;
+        LIMIT 100000;
         """
         return vector_search_query
 
@@ -105,7 +105,7 @@ class DatabaseManager:
         ) subquery
         WHERE similarity < {1-threshold}
         ORDER BY similarity DESC
-        LIMIT 10000;
+        LIMIT 100000;
         """
         return vector_search_query
     
