@@ -19,17 +19,12 @@ services:
       dockerfile: ./tasks/reportTask/Dockerfile
     image: report-task
     ports:
-      - "5001:80"  # Map host's port 5001 to container's port 80
+      - "80:80"  # Map host's port 5001 to container's port 80
     env_file:
       - ./.env
     volumes:
       - ./:/app
-    
-    command: [
-        "sh", 
-        "-c", 
-        "echo 'Contents of .:' && ls -R . && echo 'Starting uvicorn' && uvicorn tasks.reportTask.main:app --host 0.0.0.0 --port 80"
-    ]
+    command: ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]
 
   celery-worker:
     build:
@@ -41,7 +36,7 @@ services:
     volumes:
       - ./:/app
 
-    command: ["sh", "-c", "ls -R . && celery -A managers.celeryManager worker --loglevel=info --concurrency=1"]
+    command: celery -A managers.celeryManager worker --loglevel=info --concurrency=1  # Adjust the module path as needed
     depends_on:
       - redis
 
