@@ -24,7 +24,12 @@ services:
       - ./.env
     volumes:
       - ./:/app
-    command: ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]
+    
+    command: [
+        "sh", 
+        "-c", 
+        "echo 'Contents of /app:' && ls -R /app && echo 'Starting uvicorn' && uvicorn tasks.reportTask.main:app --host 0.0.0.0 --port 80"
+    ]
 
   celery-worker:
     build:
@@ -36,7 +41,7 @@ services:
     volumes:
       - ./:/app
 
-    command: celery -A managers.celeryManager worker --loglevel=info --concurrency=1  # Adjust the module path as needed
+    command: ["sh", "-c", "ls -R /app && export PYTHONPATH=/app && celery -A managers.celeryManager worker --loglevel=info --concurrency=1"]
     depends_on:
       - redis
 
