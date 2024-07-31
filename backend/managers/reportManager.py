@@ -220,9 +220,11 @@ class ReportManager:
         hyde_resps,multi_queries = self.multi_query_generator(space,perspective,context)
         space_info  = self.db_manager.search_multiple_queries(multi_queries,hyde_resps, threshold)
         log.info(f"Space Info:{len(space_info)}")
+        self.space = space
+        self.perspective=perspective
         self.space_info = self.full_rerank(space_info, multi_queries, batch_size=512, max_workers=10, perspective_specific=perspective_specific)
         self.reranked_rows_dict =  {d['id']: {k: v for k, v in d.items() if k != 'id'} for d in self.space_info}
-        self.space = space
+       
         docs = [
                 Document(
                     page_content=row['body'],
