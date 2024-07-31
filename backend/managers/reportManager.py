@@ -243,21 +243,12 @@ class ReportManager:
         self.context = context
     
     def full_rerank(self,rows, queries, batch_size=512, max_workers=10, perspective_specific=True):
-        fast_rows = self.batch_rerank(
-            os.getenv('AWS_SMALL_RERANK_MODEL'),
-            rows,
-            queries,
-            threshold=0.001,
-            batch_size=batch_size,
-            max_workers=max_workers,
-            max_posts=float('inf')
-        )
         if perspective_specific:
             space_rows = self.batch_rerank(
                 os.getenv('AWS_RERANK_MODEL'),
-                fast_rows,
+                rows,
                 queries[:5],
-                threshold=0.25, 
+                threshold=0.20, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
                 max_posts=10000)
@@ -266,9 +257,9 @@ class ReportManager:
         else:
             return self.batch_rerank(
                 os.getenv('AWS_RERANK_MODEL'),
-                fast_rows,
+                rows,
                 queries[:5],
-                threshold=0.25, 
+                threshold=0.20, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
                 max_posts=5000)

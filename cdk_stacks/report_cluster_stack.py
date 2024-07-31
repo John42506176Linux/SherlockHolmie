@@ -63,6 +63,7 @@ class ReportClusterStack(core.Stack):
                 iam.ManagedPolicy.from_aws_managed_policy_name("AmazonEC2ContainerRegistryReadOnly"),
                 iam.ManagedPolicy.from_aws_managed_policy_name("AmazonEC2ContainerRegistryPowerUser"),
                 iam.ManagedPolicy.from_aws_managed_policy_name("AmazonEC2ContainerRegistryFullAccess"),
+                iam.ManagedPolicy.from_aws_managed_policy_name("AmazonElasticFileSystemClientFullAccess")
             ],
         )
 
@@ -75,20 +76,27 @@ class ReportClusterStack(core.Stack):
         )
         file_system = efs.FileSystem(self, "MyEfsFileSystem",
             vpc=vpc.vpc,
-            lifecycle_policy=efs.LifecyclePolicy.AFTER_14_DAYS,  # files are not accessed for 14 days will move to infrequent access
-            performance_mode=efs.PerformanceMode.GENERAL_PURPOSE,  # latency optimized
+            lifecycle_policy=efs.LifecyclePolicy.AFTER_14_DAYS,
+            performance_mode=efs.PerformanceMode.GENERAL_PURPOSE,
+            security_group=ec2.SecurityGroup(self, "EfsSecurityGroup", vpc=vpc.vpc, allow_all_outbound=True)
         )
 
         # Create EFS Access Point
         access_point = file_system.add_access_point("AccessPoint",
-            path="/app",  # application directory
+            path="/app",  # Changed back to "/app" to match Docker Compose
+            create_acl=efs.Acl(
+                owner_uid="1000",
+                owner_gid="1000",
+                permissions="755"
+            ),
             posix_user=efs.PosixUser(
                 uid="1000",
                 gid="1000"
             ),
         )
+
         # Get latest image tags
-        latest_report_image_tag = '8a37941'  # Hardcoded for now
+        latest_report_image_tag = '3d87d19'  # Hardcoded for now
         latest_celery_report_image_tag = '8a37941'
 
         # Create security groups
@@ -215,14 +223,15 @@ class ReportClusterStack(core.Stack):
                 authorization_config=ecs.AuthorizationConfig(
                     access_point_id=access_point.access_point_id,
                     iam="ENABLED"
-                )
+                ),
+                root_directory="/"
             )
         )
 
         report_container = report_task_definition.find_container("web")
         report_container.add_mount_points(
             ecs.MountPoint(
-                container_path="/app",
+                container_path="/app",  # Changed back to "/app" to match Docker Compose
                 source_volume="app-volume",
                 read_only=False
             )
@@ -235,38 +244,52 @@ class ReportClusterStack(core.Stack):
                 authorization_config=ecs.AuthorizationConfig(
                     access_point_id=access_point.access_point_id,
                     iam="ENABLED"
-                )
+                ),
+                root_directory="/"
             )
         )
 
         celery_container.add_mount_points(
             ecs.MountPoint(
-                container_path="/app",
+                container_path="/app",  # Changed back to "/app" to match Docker Compose
                 source_volume="app-volume",
                 read_only=False
             )
         )
 
+        # Update IAM permissions
         task_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "elasticfilesystem:ClientMount",
-                    "elasticfilesystem:ClientRootAccess",
-                    "elasticfilesystem:ClientWrite"
+                    "elasticfilesystem:ClientWrite",
+                    "elasticfilesystem:DescribeMountTargets"
                 ],
                 resources=[file_system.file_system_arn]
             )
         )
 
-        # Grant root access to the file system from the task role
-        # file_system.grant_access_point_permissions(access_point, 
-        #     iam.GrantPrincipal(celery_worker_service.task_definition.task_role))
-
-        # Allow connections to the default port of the file system from the service
+        # Allow connections to EFS from the services
         file_system.connections.allow_default_port_from(celery_worker_service.connections)
-
-        # file_system.grant_access_point_permissions(access_point, 
-        #     iam.GrantPrincipal(report_service.task_definition.task_role))
-
-        # Allow connections to the default port of the file system from the service
         file_system.connections.allow_default_port_from(report_service.service.connections)
+
+        # Grant access point permissions
+        efs.FileSystem.from_file_system_attributes(
+            self, "ImportedFileSystem",
+            file_system_id=file_system.file_system_id,
+            security_group=file_system.connections.security_groups[0]
+        ).grant_root_access(celery_worker_service.task_definition.task_role)
+        
+        efs.FileSystem.from_file_system_attributes(
+            self, "ImportedFileSystem2",
+            file_system_id=file_system.file_system_id,
+            security_group=file_system.connections.security_groups[0]
+        ).grant_root_access(report_service.task_definition.task_role)
+
+        efs_sg = ec2.SecurityGroup(self, "EFSSecurityGroup", vpc=vpc.vpc)
+        efs_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(2049), "Allow NFS traffic")
+
+        file_system.connections.allow_default_port_from(report_sg)
+        file_system.connections.allow_default_port_from(celery_sg)
+
+                
