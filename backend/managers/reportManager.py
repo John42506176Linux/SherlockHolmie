@@ -222,6 +222,7 @@ class ReportManager:
         log.info(f"Space Info:{len(space_info)}")
         self.space = space
         self.perspective=perspective
+        self.context=context
         self.space_info = self.full_rerank(space_info, multi_queries, batch_size=512, max_workers=10, perspective_specific=perspective_specific)
         self.reranked_rows_dict =  {d['id']: {k: v for k, v in d.items() if k != 'id'} for d in self.space_info}
        
