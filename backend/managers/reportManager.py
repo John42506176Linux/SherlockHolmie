@@ -89,10 +89,9 @@ class ReportManager:
             HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
         },).bind(generation_config={ "response_mime_type": "application/json"})
         
-        self.openai_big_llm =  ChatOpenAI(temperature=0, model="gpt-4o",max_retries=30).bind(response_format={ "type": "json_object" }).with_retry(
-            # retry_if_exception_type=(ValueError,), # Retry only on ValueError
+        self.openai_big_llm = ChatOpenAI(temperature=0, model="gpt-4o-mini").bind(response_format={ "type": "json_object" }).with_retry(
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
-            stop_after_attempt=15, # Try twice
+            stop_after_attempt=30, # Try twice
         )
         self.openai_small_llm_json = ChatOpenAI(temperature=0, model="gpt-4o-mini").with_retry(
             # retry_if_exception_type=(ValueError,), # Retry only on ValueError
@@ -217,12 +216,15 @@ class ReportManager:
         if self.space_info is not None:
             log.error("Space already initialized")
             return None
-        hyde_resps,multi_queries = self.multi_query_generator(space,perspective,context)
-        space_info  = self.db_manager.search_multiple_queries(multi_queries,hyde_resps, threshold)
-        log.info(f"Space Info:{len(space_info)}")
         self.space = space
         self.perspective=perspective
         self.context=context
+        log.info(f"Space:{self.space} Perspective:{self.perspective} Context:{self.context}")
+        hyde_resps,multi_queries = self.multi_query_generator(space,perspective,context)
+        space_info  = self.db_manager.search_multiple_queries(multi_queries,hyde_resps, threshold)
+        
+        log.info(f"Space Info:{len(space_info)}")
+
         self.space_info = self.full_rerank(space_info, multi_queries, batch_size=512, max_workers=10, perspective_specific=perspective_specific)
         self.reranked_rows_dict =  {d['id']: {k: v for k, v in d.items() if k != 'id'} for d in self.space_info}
        
