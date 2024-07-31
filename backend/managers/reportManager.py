@@ -247,7 +247,7 @@ class ReportManager:
             os.getenv('AWS_SMALL_RERANK_MODEL'),
             rows,
             queries,
-            threshold=0.001,
+            threshold=0.0006,
             batch_size=batch_size,
             max_workers=max_workers,
             max_posts=float('inf')
@@ -512,7 +512,7 @@ class ReportManager:
         1. Is the post topic relevant to the given space? (true/false) 
         - Only state true if the topic the user discusses inside the post is directly relevant to the space.
         2. Is the author of the post from the exact perspective provided? (true/false)
-        - Only state true if the user --DIRECTLY OR INDIRECTLY-- states that they are OR was the exact given perspective. Do not infer based on knowledge expressed. Only state true if you can conclusively prove they are a perspective.
+        - Only state true if the user --DIRECTLY OR INDIRECTLY-- states that they are OR was the given perspective. Do not infer based on knowledge expressed. Only state true if you can conclusively prove they are the given perspective.
         4. Explain how the title relates to the space and perspective.
 
         {format_instructions}

@@ -87,7 +87,7 @@ class DatabaseManager:
             FROM reddit_posts
         ) subquery
         WHERE similarity > {threshold}
-        ORDER BY similarity ASC
+        ORDER BY similarity DESC
         LIMIT 150000;
         """
         return vector_search_query
@@ -104,7 +104,7 @@ class DatabaseManager:
             FROM reddit_posts
         ) subquery
         WHERE similarity < {1-threshold}
-        ORDER BY similarity ASC
+        ORDER BY similarity DESC
         LIMIT 150000;
         """
         return vector_search_query
@@ -124,7 +124,7 @@ class DatabaseManager:
                 LIMIT 150000
             ) AS keyword_filtered
             WHERE similarity > {filter_value}
-            ORDER BY similarity ASC
+            ORDER BY similarity DESC
         """
         return vector_search_query
     
