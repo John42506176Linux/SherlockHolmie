@@ -88,7 +88,7 @@ class DatabaseManager:
         ) subquery
         WHERE similarity > {threshold}
         ORDER BY similarity DESC
-        LIMIT 150000;
+        LIMIT 200000;
         """
         return vector_search_query
 
@@ -105,7 +105,7 @@ class DatabaseManager:
         ) subquery
         WHERE similarity < {1-threshold}
         ORDER BY similarity DESC
-        LIMIT 150000;
+        LIMIT 200000;
         """
         return vector_search_query
     
@@ -121,7 +121,7 @@ class DatabaseManager:
                 FROM reddit_posts
                 WHERE fts @@ phraseto_tsquery('english','{company}')
                 ORDER BY created_utc DESC
-                LIMIT 150000
+                LIMIT 200000
             ) AS keyword_filtered
             WHERE similarity > {filter_value}
             ORDER BY similarity DESC
@@ -134,7 +134,7 @@ class DatabaseManager:
                 FROM reddit_posts
                 WHERE fts @@ phraseto_tsquery('english','{company}')
                 ORDER BY created_utc DESC
-                LIMIT 150000;
+                LIMIT 200000;
             """
     
     def space_search_query(self,space,threshold=0.55):
