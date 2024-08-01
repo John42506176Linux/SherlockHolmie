@@ -33,17 +33,17 @@ def process_space_task(params):
         )
         log.info(f"Space Size: {report_manager.get_space_size()}")
 
-        personas = report_manager.get_personas(
+        report_manager.get_personas(
             concurrency=params['concurrency'],
             batch_size=params['batch_size']
         )
 
-        pain_points = report_manager.get_pain_points(
+        report_manager.get_pain_points(
             concurrency=params['concurrency'],
             batch_size=params['batch_size']
         )
-        pain_points_dict = [pp.dict() for pp in pain_points]
-        personas_dict = [p.dict() for p in personas]
+        pain_points_dict = [pp.dict() for pp in report_manager.pain_points]
+        personas_dict = [p.dict() for p in report_manager.personas]
 
         result = {
             "Pain Points": pain_points_dict,
