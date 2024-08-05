@@ -1000,7 +1000,7 @@ class ReportManager:
             Z = linkage(distances[np.triu_indices(distances.shape[0], k=1)], method='average')
 
             # Extract clusters with a distance threshold of 0.6
-            cluster_labels = fcluster(Z, t=0.1, criterion='distance')
+            cluster_labels = fcluster(Z, t=0.07, criterion='distance')
 
             # Group clusters based on the labels
             clustered_personas = {}
