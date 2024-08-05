@@ -5,7 +5,6 @@ from managers.databaseManager import DatabaseManager
 from managers.reportManager import ReportManager
 import os 
 import requests
-import json
 
 NEXTJS_API_URL=os.getenv('NEXTJS_API_URL')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
@@ -50,8 +49,6 @@ def process_space_task(params):
             "Pain Points": pain_points_dict,
             "Personas": personas_dict
         }
-        with open(f'result-{params["request_id"]}.json', 'w') as f:
-            json.dump(result, f)
 
         # Send result to Next.js API
         requests.post(NEXTJS_API_URL, json={"requestId": params['request_id'], "result": result})
