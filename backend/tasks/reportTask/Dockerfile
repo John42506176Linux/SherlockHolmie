@@ -13,4 +13,7 @@ RUN pip install -r requirements.txt
 EXPOSE 80
 
 # Run fts_query.py when the container launches
-CMD ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]
+RUN chmod +x startup.sh
+
+# Use the startup script as the command to run when the container starts
+CMD ["/bin/sh", "startup.sh"]

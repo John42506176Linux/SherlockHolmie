@@ -24,19 +24,7 @@ services:
       - ./.env
     volumes:
       - ./:/app
-    command: ["uvicorn", "tasks.reportTask.main:app", "--host", "0.0.0.0", "--port", "80"]
-
-  celery-worker:
-    build:
-      context: .
-      dockerfile: ./tasks/reportTask/Dockerfile  # Use the same Dockerfile as report-task
-    image: celery-worker
-    env_file:
-      - ./.env
-    volumes:
-      - ./:/app
-
-    command: celery -A managers.celeryManager worker --loglevel=info --concurrency=1  # Adjust the module path as needed
+    command: ["/bin/sh", "/app/startup.sh"]
     depends_on:
       - redis
 
