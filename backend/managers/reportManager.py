@@ -1110,7 +1110,7 @@ class ReportManager:
             Z = linkage(1 - distances, method='average')
             
             # Extract clusters with a distance threshold of 0.05
-            cluster_labels = fcluster(Z, t=0.65, criterion='distance')
+            cluster_labels = fcluster(Z, t=0.6, criterion='distance')
 
             # Group clusters based on the labels
             clustered_pain_points = {}
