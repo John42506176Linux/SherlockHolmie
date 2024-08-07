@@ -252,7 +252,7 @@ class ReportManager:
             os.getenv('AWS_SMALL_RERANK_MODEL'),
             rows,
             queries,
-            threshold=0.0005,
+            threshold=0.0001,
             batch_size=batch_size,
             max_workers=max_workers,
             max_posts=float('inf')
@@ -261,7 +261,7 @@ class ReportManager:
             space_rows = self.batch_rerank(
                 os.getenv('AWS_RERANK_MODEL'),
                 fast_rows,
-                queries[:5],
+                queries,
                 threshold=0.20, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
