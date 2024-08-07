@@ -1,17 +1,19 @@
-import requests
+import weaviate
+import os
+import logging.handlers
+from dotenv import load_dotenv
+from managers.databaseManager import DatabaseManager
 
-# Define the URL of the endpoint
-url = 'http://localhost:3000/api/tasks'
+log = logging.getLogger("bot")
+log.setLevel(logging.DEBUG)
+log.addHandler(logging.StreamHandler())
 
-# Define the data to be sent in the body of the POST request
-data = {
-    'requestId': 'some_value',  # Replace 'some_value' with the actual value you want to test
-    'result': 'another_value'   # Replace 'another_value' with the actual value you want to test
-}
-
-# Send the POST request
-response = requests.post(url, json=data)
-
-# Print the response status code and JSON body
-print(f"Status Code: {response.status_code}")
-print(f"Response JSON: {response.json()}")
+load_dotenv()
+# Set these environment variables
+URL = os.getenv("WCS_URL")
+APIKEY = os.getenv("WCS_API_KEY")
+  
+# Connect to a WCS instance
+client = weaviate.connect_to_wcs(
+    cluster_url=URL,
+    auth_credentials=weaviate.auth.AuthApiKey(APIKEY))
