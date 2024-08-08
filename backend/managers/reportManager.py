@@ -98,7 +98,7 @@ class ReportManager:
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
             stop_after_attempt=15, # Try twice
         )
-        self.openai_creative_llm_json =  ChatOpenAI(temperature=0.7, model="gpt-4o-mini").bind(response_format={ "type": "json_object" }).with_retry(
+        self.openai_creative_llm_json =  ChatOpenAI(temperature=0, model="gpt-4o-mini").bind(response_format={ "type": "json_object" }).with_retry(
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
             stop_after_attempt=10, # Try twice
         )
@@ -168,7 +168,7 @@ class ReportManager:
             input_variables=["space","perspective","objective"],
             partial_variables={"format_instructions": query_json_parser.get_format_instructions()},
             template="""You are an AI language model assistant. 
-            Your task is to generate at least 5 different questions to help meet the user's business objective given a space, and the type of perspective they want answers from.
+            Your task is to generate at least 10 different questions to help meet the user's business objective given a space, and the type of perspective they want answers from.
             Your goal is to generate different questions that shows different aspects of the user's question. By generating multiple perspectives/using differing syntaxes on the user question, your goal is to help
             the user overcome some of the limitations of the distance-based similarity search and rerankers.
             Be diverse with the types of question's you ask to cover the full breadth of the user's business objective, but make sure the questions are targeted toward the right perspective and space.
@@ -204,6 +204,7 @@ class ReportManager:
         })
         hyde_input_list = []
         for resp in multiquery_resp['query']:
+            log.info(f"Query:{resp}")
             hyde_input_list.append({
                 'question': resp,
                 'objective': context

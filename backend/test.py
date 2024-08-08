@@ -15,5 +15,7 @@ APIKEY = os.getenv("WCS_API_KEY")
   
 # Connect to a WCS instance
 client = weaviate.connect_to_wcs(
-    cluster_url=URL,
-    auth_credentials=weaviate.auth.AuthApiKey(APIKEY))
+cluster_url=URL,
+auth_credentials=weaviate.auth.AuthApiKey(APIKEY))
+
+client.close()
