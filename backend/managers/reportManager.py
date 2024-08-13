@@ -544,7 +544,7 @@ class ReportManager:
                 }
             )
         analyze_chain = prompt | self.openai_small_llm_json | parser
-        results = analyze_chain.batch(batch_inputs,config={"max_concurrency": 5,"callbacks": [BatchCallback(len(batch_inputs))]})
+        results = analyze_chain.batch(batch_inputs,config={"max_concurrency": 3,"callbacks": [BatchCallback(len(batch_inputs))]})
     
         return results
     
