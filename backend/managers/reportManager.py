@@ -263,10 +263,10 @@ class ReportManager:
                 os.getenv('AWS_RERANK_MODEL'),
                 fast_rows,
                 queries,
-                threshold=0.20, 
+                threshold=0.06, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
-                max_posts=10000)
+                max_posts=10000)[:5000]
             perspective_specific_rows = self.llm_rerank(space_rows)
             return perspective_specific_rows
         else:

@@ -1,6 +1,7 @@
 port=7997
-small_embedding_model=nomic-ai/nomic-embed-text-v1.5
 mixed_bread_model=mixedbread-ai/mxbai-rerank-large-v1
+mixed_bread_embedding_model=mixedbread-ai/mxbai-embed-large-v1
+mid_rerank_model=mixedbread-ai/mxbai-rerank-xsmall-v1
 small_rerank_model=cross-encoder/ms-marco-TinyBERT-L-2-v2
 volume=$PWD/data
 
@@ -11,13 +12,33 @@ sudo docker run -it --gpus all \
  v2 \
  --batch-size 32 \
  --model-id $mixed_bread_model \
- --model-id $small_embedding_model \
+ --model-id $mixed_bread_embedding_model \
  --model-id $small_rerank_model \
-
+ --model-id $mid_rerank_model \
  --port $port
+
+
+port=7997
+mixed_bread_model=mixedbread-ai/mxbai-rerank-large-v1
+mixed_bread_embedding_model=mixedbread-ai/mxbai-embed-large-v1
+mid_rerank_model=mxbai-rerank-xsmall-v1/resolve/main/onnx/model_quantized.onnx
+small_rerank_model=cross-encoder/ms-marco-TinyBERT-L-2-v2
+volume=$PWD/data
+
+sudo docker run -it --gpus all \
+ -v $volume:/app/.cache \
+ -p $port:$port \
+ michaelf34/infinity:latest \
+ v2 \
+ --batch-size 32 \
+ --model-id $mid_rerank_model \
+ --engine optimum \
+ --port $port
+
 
 port=7997
 small_embedding_model=nomic-ai/nomic-embed-text-v1.5
+
 rerank_model=cross-encoder/ms-marco-MiniLM-L-12-v2
 mixed_bread_model=BAAI/bge-reranker-v2-m3
 volume=$PWD/data
