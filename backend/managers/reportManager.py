@@ -266,7 +266,7 @@ class ReportManager:
                 threshold=0.06, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
-                max_posts=10000)[:5000]
+                max_posts=float('inf'))[:15000]
             perspective_specific_rows = self.llm_rerank(space_rows)
             return perspective_specific_rows
         else:
