@@ -740,8 +740,8 @@ class ReportManager:
         scaled_embeddings = scaler.fit_transform(final_persona_embeddings)
 
         # HDBSCAN clustering
-        cluster_size  = 3 if len(scaled_embeddings) < 100 else 5
-        min_samples = 2 if len(scaled_embeddings) < 100 else 3
+        cluster_size  = 2 if len(scaled_embeddings) < 100 else 5
+        min_samples = 1 if len(scaled_embeddings) < 100 else 3
         clusterer = hdbscan.HDBSCAN(metric='euclidean', min_cluster_size=cluster_size, min_samples=min_samples)
         labels = clusterer.fit_predict(scaled_embeddings)
 
