@@ -89,7 +89,7 @@ class ReportManager:
             HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
         },).bind(generation_config={ "response_mime_type": "application/json"})
         
-        self.openai_big_llm = ChatOpenAI(temperature=0, model="gpt-4o-mini").bind(response_format={ "type": "json_object" }).with_retry(
+        self.openai_big_llm = ChatOpenAI(temperature=0, model="gpt-4o").bind(response_format={ "type": "json_object" }).with_retry(
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
             stop_after_attempt=30, # Try twice
         )
@@ -649,7 +649,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
         
-        chain = chat_template | self.openai_small_llm_json | parser
+        chain = chat_template | self.openai_big_llm | parser
         log.info("Starting Batch Pain Points")
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(queries))]})
@@ -850,7 +850,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
             cluster_indices.append(cluster)
-        chain = chat_template | self.openai_small_llm_json | parser
+        chain = chat_template | self.openai_big_llm | parser
 
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency})
@@ -932,7 +932,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
             cluster_indices.append(cluster)
-        chain = chat_template | self.openai_small_llm_json | parser
+        chain = chat_template | self.openai_big_llm | parser
 
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency})
