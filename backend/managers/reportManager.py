@@ -25,7 +25,6 @@ from langchain_core.output_parsers import JsonOutputParser
 from collections import defaultdict
 import logging.handlers
 from collections import Counter
-from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from parsers.error_json_parser import ErrorJsonParser
 from typing import List,Dict
 from tqdm import tqdm
@@ -578,7 +577,7 @@ class ReportManager:
         - NO EXTRAPOLATION: Only choose pain points explicitly mentioned by the user.
 
         Requirements:
-        - Quality: Each pain point must be:
+        - Quality: Each pain point must be specific and actionable and directly mentioned in the Reddit post:
         - Relevant: The quote must directly and unambiguously reflect the pain point.
         - Specific: Avoid vague or general issues unspecific to the specific, like "Negative Experiences". Focus on what is specifically causing the pain for this space in the given quote.
         - Directional: Use action-oriented language to convey the nature of the problem (e.g., "Difficulty in...", "Lack of...").
