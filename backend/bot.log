@@ -1,0 +1,13 @@
+2024-08-15 17:24:24,610 - bot - INFO - Starting the Weaviate data import script
+2024-08-15 17:24:24,629 - bot - DEBUG - WCS_URL: https://rf96lq7csvghlvunwnc1vg.c0.australia-southeast1.gcp.weaviate.cloud
+2024-08-15 17:24:24,629 - bot - DEBUG - WCS_API_KEY: ************************************
+2024-08-15 17:24:24,629 - bot - INFO - Connecting to WCS instance
+2024-08-15 17:24:25,940 - bot - INFO - Successfully connected to WCS instance
+2024-08-15 17:24:25,942 - bot - INFO - Fetching data from https://raw.githubusercontent.com/weaviate-tutorials/quickstart/main/data/jeopardy_tiny_with_vectors_all-OpenAI-ada-002.json
+2024-08-15 17:24:26,227 - bot - INFO - Successfully fetched and parsed data. Total items: 10
+2024-08-15 17:24:26,228 - bot - INFO - Processing data and creating DataObjects
+2024-08-15 17:24:26,229 - bot - INFO - Created 10 DataObjects
+2024-08-15 17:24:26,230 - bot - INFO - Inserting data into Weaviate
+2024-08-15 17:24:28,558 - bot - INFO - Successfully inserted all data into Weaviate
+2024-08-15 17:24:28,559 - bot - INFO - Closing Weaviate client connection
+2024-08-15 17:24:28,566 - bot - INFO - Script execution completed successfully
