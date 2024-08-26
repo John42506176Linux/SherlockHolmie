@@ -1,4 +1,4 @@
-from managers.databaseManager import DatabaseManager
+from managers.weaviateDBManager import WeaviateManager
 from langchain.docstore.document import Document
 from langchain_google_genai import (
     ChatGoogleGenerativeAI,
@@ -60,8 +60,8 @@ class BatchCallback(BaseCallbackHandler):
 
 # TODO: Handle no pain points   
 class ReportManager:
-    def __init__(self,db_manager:DatabaseManager):
-        self.db_manager = db_manager
+    def __init__(self,wv_manager: WeaviateManager):
+        self.wv_manager = wv_manager
         self.report_type = "Space" # TODO: Turn this into a class attribute
         self.large_json_llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest",safety_settings={
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
@@ -221,7 +221,7 @@ class ReportManager:
         self.context=context
         log.info(f"Space:{self.space} Perspective:{self.perspective} Context:{self.context}")
         hyde_resps,multi_queries = self.multi_query_generator(space,perspective,context)
-        space_info  = self.db_manager.search_multiple_queries(multi_queries,hyde_resps, threshold)
+        space_info  = self.wv_manager.search_multiple_queries(hyde_resps)
         
         log.info(f"Space Info:{len(space_info)}")
 
@@ -303,7 +303,7 @@ class ReportManager:
 
         for i in tqdm(range(0, len(rows), batch_size), desc="Processing Batches"):
             batch = rows[i:i+batch_size]
-            texts = [f'Subreddit:{row["subreddit_name"]} Title:{extract_post_slug(row["permalink"])} Post: {row["body"]}' for row in batch]
+            texts = [f'Subreddit:{row["subreddit_name"]} Title:{row['title']} Post: {row["body"]}' for row in batch]
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_query = {executor.submit(send_request, query, texts): query for query in queries}
                 for future in as_completed(future_to_query):

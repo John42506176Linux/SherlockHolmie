@@ -1,4 +1,3 @@
-from langchain_openai import OpenAIEmbeddings
 import math
 import numpy as np
 import time
@@ -7,15 +6,18 @@ from tqdm import tqdm
 from models.models import RedditPost
 from datetime import datetime
 from managers.databaseManager import DatabaseManager
+from managers.embeddedManager import CustomEmbedder,KeywordManager,WeaviateManager
 import logging
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
+import os
 
 class RedditEmbedder:
-    def __init__(self, db_manager: DatabaseManager, model="text-embedding-3-large", dimensions=256, show_progress_bar=True, max_retries=5, retry_max_seconds=120):
+    def __init__(self, model= os.getenv('AWS_EMBEDDING_MODEL'), dimensions=512, show_progress_bar=True, max_retries=5, retry_max_seconds=120):
         self.log = logging.getLogger("bot")
-        self.embeddings = OpenAIEmbeddings(model=model, dimensions=dimensions, show_progress_bar=show_progress_bar, max_retries=max_retries, retry_max_seconds=retry_max_seconds)
-        self.db_manager = db_manager
+        self.embedder = CustomEmbedder(model_name=model,dimensions=dimensions)
+        self.keywords_manager = KeywordManager()
+        self.wv_manager = WeaviateManager()
 
     @staticmethod
     def process_embedding(bs):
@@ -24,58 +26,34 @@ class RedditEmbedder:
 
     def process_chunk_and_append_to_file(self, chunk):
         # Assuming 'combined_text' is the column to embed
-        texts = chunk['combined_text'].tolist()
-        embedding_list = self.embeddings.embed_documents(texts)
-
-        # Convert the list of embeddings into a DataFrame
-        chunk['embeddings'] = [self.process_embedding(embedding) for embedding in embedding_list]
         self.log.info("Processing embedding")
         start_time =  time.time()
         try:
             posts = []
             for index, post in chunk.iterrows():
-                reddit_post = RedditPost(
-                    id=post['id'],
-                    author=post['author'],
-                    created_utc=datetime.fromtimestamp(post['created_utc']),
-                    permalink=post['permalink'],
-                    score=post['score'],
-                    body=post['body'],
-                    combined_text=post['combined_text'],
-                    embeddings=post['embeddings'],
-                    num_comments=post['num_comments'],
-                    subreddit_name=post['subreddit'],
-                    link_id=post['link_id'],
-                    parent_id=post['parent_id'],
-                    is_post=post['is_post'],
-                    archived=post['archived'],
-                    title=post['title']
-                )
-                posts.append(reddit_post)
-            
-            serialized_posts = [post.serialize() for post in posts]
-            self.log.info("Serialize posts")
-            stmt = insert(RedditPost).values(serialized_posts)
-            stmt = stmt.on_conflict_do_update(
-                index_elements=['id'],
-                set_={
-                    'score': stmt.excluded.score,
-                    'num_comments': stmt.excluded.num_comments,
-                    'archived': stmt.excluded.archived
+                properies = {
+                    'id': post['id'],
+                    'author': post['author'],
+                    'created_utc': post['created_utc'],
+                    'permalink': post['permalink'],
+                    'score': post['score'],
+                    'body': post['body'],
+                    'num_comments': post['num_comments'],
+                    'subreddit': post['subreddit'],
+                    'link_id': post['link_id'],
+                    'parent_id': post['parent_id'],
+                    'is_post': post['is_post'],
+                    'archived': post['archived'],
+                    'parent_post': post['parent_post'],
+                    'title': post['title'],
                 }
-            )
-            self.log.info("Inserting posts")
-            self.db_manager.db.execute(stmt)
-            self.db_manager.db.commit()
+                posts.append(properies)
+            self.wv_manager.bulk_insert_weaviate(posts)
+        
             self.log.info(f"Elapsed Time:{time.time()-start_time}")
             self.log.info("Posts inserted")
             self.log.info("Documents embedded and added successfully")
-        except IntegrityError as e:
-            self.db_manager.db.rollback()
-            self.log.error(f"INTEGRITY ERROR WHEN Inserting documents:"[0:500])
-            raise Exception(e)
         except Exception as e:
-            self.db_manager.db.rollback()
             self.log.error(f"Error occurred Inserting Batch Documents: {e}"[0:500])
 
     def bulk_embed_posts(self):

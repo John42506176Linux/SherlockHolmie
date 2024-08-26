@@ -1,7 +1,10 @@
 import json
 import re
 import logging.handlers
-
+import os
+from tqdm import tqdm
+import requests
+import numpy as np
 
 # TODO: Set up full logging
 log = logging.getLogger("bot")
@@ -11,6 +14,30 @@ def escape_quotes_in_json(json_string):
     # Use a regular expression to find non-escaped quotes within JSON data
     escaped_string = re.sub(r'(?<!\\)"', r'\"', json_string)
     return escaped_string
+
+def embed_documents(model_name, docs, batch_size=2048,dimensions=512):
+    url = os.getenv('AWS_EMBEDDING_URL')
+    embeddings = []
+    
+    # Split docs into batches
+    for i in tqdm(range(0, len(docs), batch_size), desc="Embedding Documents"):
+        batch = list(docs[i:i+batch_size])
+        
+        payload = {
+            "model": model_name,
+            "input": batch,
+            "return_documents": False,
+        }
+        try:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+            response_json = response.json()['data']
+            for embedding in response_json:
+                embeddings.append(np.array((embedding['embedding'][:dimensions])))
+        except requests.exceptions.RequestException as e:
+            print(f"Error embedding documents: {e}")
+            return None
+    return np.array(embeddings)
 
 def extract_post_slug(url):
     # Define the regex pattern to extract the post slug

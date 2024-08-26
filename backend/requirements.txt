@@ -21,3 +21,6 @@ hdbscan
 redis
 celery
 botocore
+keybert[spacy]
+keyphrase-vectorizers
+weaviate-client

@@ -21,6 +21,7 @@ log = logging.getLogger("bot")
 
 class RedditDownloader:
     def __init__(self,start_date, end_date, subreddit,output_folder,is_post):
+        log.info(f"Subreddit 2:{subreddit}")
         self.url = f"https://arctic-shift.photon-reddit.com/api/{'posts' if is_post else 'comments'}/search?sort=asc&subreddit={subreddit}"
         self.start_date = start_date.timestamp()
         self.end_date = end_date.timestamp()
