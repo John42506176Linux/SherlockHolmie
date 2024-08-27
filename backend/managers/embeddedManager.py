@@ -13,11 +13,29 @@ from weaviate.util import generate_uuid5
 import datetime
 from datetime import datetime, timezone
 from utilities.utils import embed_documents
+from tenacity import retry, stop_after_attempt
+
 
 
 
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
+
+@retry(stop=stop_after_attempt(3))
+def process_batch(batch, property_rows, title_vectors, posts_vectors, keyword_vectors):
+    for i, data_row in enumerate(property_rows):
+        batch.add_object(
+            properties=data_row,
+            vector={
+                "title_vector" : title_vectors[i],
+                "posts_vector": posts_vectors[i],
+                "keywords_vector": keyword_vectors[i],
+            },
+            uuid=generate_uuid5(data_row['reddit_id'])
+        )
+    log.info(f"Num Errors:{batch.number_errors}")
+    if batch.number_errors > 0:
+        raise Exception("Batch processing failed")
 
 class CustomEmbedder(BaseEmbedder):
     def __init__(self, model_name,dimensions=512):
@@ -96,17 +114,10 @@ class WeaviateManager():
             } for post,keyword in zip(posts,keywords)
         ]
         with self.reddit_collection.batch.dynamic() as batch:
-            for i, data_row in enumerate(property_rows):
-                batch.add_object(
-                    properties=data_row,
-                    vector={
-                        "title_vector" : title_vectors[i],
-                        "posts_vector": posts_vectors[i],
-                        "keywords_vector": keyword_vectors[i],
-                    },
-                    uuid=generate_uuid5(data_row['reddit_id'])
-                )
-            log.info(f"Num Errors:{batch.number_errors}")
+            try:
+                process_batch(batch, property_rows, title_vectors, posts_vectors, keyword_vectors)
+            except Exception as e:
+                log.error(f"Batch processing failed after 3 attempts. Failed objects: {reddit_collection.batch.failed_objects}")
         log.info("Batch completed")
 
 
