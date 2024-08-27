@@ -5,6 +5,8 @@ import os
 from tqdm import tqdm
 import requests
 import numpy as np
+import time
+from langchain_community.embeddings import InfinityEmbeddings
 
 # TODO: Set up full logging
 log = logging.getLogger("bot")
@@ -15,29 +17,23 @@ def escape_quotes_in_json(json_string):
     escaped_string = re.sub(r'(?<!\\)"', r'\"', json_string)
     return escaped_string
 
-def embed_documents(model_name, docs, batch_size=256,dimensions=512):
-    url = os.getenv('AWS_EMBEDDING_URL')
-    embeddings = []
+def embed_documents(model_name, docs, dimensions=512):
     
-    # Split docs into batches
-    for i in tqdm(range(0, len(docs), batch_size), desc="Embedding Documents"):
-        batch = list(docs[i:i+batch_size])
-        
-        payload = {
-            "model": model_name,
-            "input": batch,
-            "return_documents": False,
-        }
-        try:
-            response = requests.post(url, json=payload)
-            response.raise_for_status()
-            response_json = response.json()['data']
-            for embedding in response_json:
-                embeddings.append(np.array((embedding['embedding'][:dimensions])))
-        except requests.exceptions.RequestException as e:
-            print(f"Error embedding documents: {e}")
-            return None
-    return np.array(embeddings)
+    url = os.getenv('AWS_EMBEDDING_URL')
+    log.info(f"Starting embedding of {len(docs)} documents")
+    start_time = time.time()
+    embeddings = []
+    infinity_embeddings = InfinityEmbeddings(
+        model=model_name, infinity_api_url=url
+    )
+    embeddings = infinity_embeddings.embed_documents(docs)
+    embeddings = np.array([np.array(embedding[:dimensions]) for embedding in embeddings])
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    log.info(f"Time taken to embed documents: {elapsed_time} seconds")
+    
+    return embeddings
 
 def extract_post_slug(url):
     # Define the regex pattern to extract the post slug
