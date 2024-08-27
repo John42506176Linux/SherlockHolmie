@@ -15,7 +15,7 @@ def escape_quotes_in_json(json_string):
     escaped_string = re.sub(r'(?<!\\)"', r'\"', json_string)
     return escaped_string
 
-def embed_documents(model_name, docs, batch_size=512,dimensions=512):
+def embed_documents(model_name, docs, batch_size=256,dimensions=512):
     url = os.getenv('AWS_EMBEDDING_URL')
     embeddings = []
     
