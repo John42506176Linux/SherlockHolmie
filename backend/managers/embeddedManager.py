@@ -14,28 +14,11 @@ import datetime
 from datetime import datetime, timezone
 from utilities.utils import embed_documents
 from tenacity import retry, stop_after_attempt
-
-
+import time
 
 
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
-
-@retry(stop=stop_after_attempt(3))
-def process_batch(batch, property_rows, title_vectors, posts_vectors, keyword_vectors):
-    for i, data_row in enumerate(property_rows):
-        batch.add_object(
-            properties=data_row,
-            vector={
-                "title_vector" : title_vectors[i],
-                "posts_vector": posts_vectors[i],
-                "keywords_vector": keyword_vectors[i],
-            },
-            uuid=generate_uuid5(data_row['reddit_id'])
-        )
-    log.info(f"Num Errors:{batch.number_errors}")
-    if batch.number_errors > 0:
-        raise Exception("Batch processing failed")
 
 class CustomEmbedder(BaseEmbedder):
     def __init__(self, model_name,dimensions=512):
@@ -93,6 +76,7 @@ class WeaviateManager():
         log.info("Embedding keywords")
         keyword_vectors = self.keywords_manager.embed_keywords()
         log.info("Inserting into Weaviate")
+        
         property_rows = [
             {
                 "title": post['title'],
@@ -113,11 +97,35 @@ class WeaviateManager():
                 "keywords" : ', '.join([item[0] for item in keyword]),
             } for post,keyword in zip(posts,keywords)
         ]
+        max_retries = 5
+        retry_interval = 100
+        retry_delay = 5  # Delay in seconds before retrying
+        start_time = time.time()
+
         with self.reddit_collection.batch.dynamic() as batch:
-            try:
-                process_batch(batch, property_rows, title_vectors, posts_vectors, keyword_vectors)
-            except Exception as e:
-                log.error(f"Batch processing failed after 3 attempts. Failed objects: {reddit_collection.batch.failed_objects}")
+            for attempt in range(max_retries):
+                try:
+                    for i, data_row in enumerate(property_rows):
+                        batch.add_object(
+                            properties=data_row,
+                            vector={
+                                "title_vector": title_vectors[i],
+                                "posts_vector": posts_vectors[i],
+                                "keywords_vector": keyword_vectors[i],
+                            },
+                            uuid=generate_uuid5(data_row['reddit_id'])
+                        )
+                    log.info(f"Num Errors: {batch.number_errors}")
+                    if batch.number_errors > 0:
+                        log.error(f"Failed objects: {self.reddit_collection.batch.failed_objects}")
+                        log.error(f"Failed objects: {self.client.batch.failed_objects}")
+                        raise Exception("Batch processing failed")
+                    break  # Exit the loop if no errors occurred
+                except Exception as e:
+                    log.error(f"Attempt {attempt + 1}/{max_retries} failed. Retrying in {retry_delay} seconds...")
+                    if attempt + 1 != max_retries:
+                        time.sleep(retry_delay)
+        log.info(f"Elapsed Insertion Time:{time.time()-start_time}")
         log.info("Batch completed")
 
 

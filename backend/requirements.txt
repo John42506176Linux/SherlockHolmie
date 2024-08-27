@@ -24,3 +24,4 @@ botocore
 keybert[spacy]
 keyphrase-vectorizers
 weaviate-client
+tenacity

@@ -35,6 +35,7 @@ class WeaviateManager:
             return None
     
     def close(self):
+        log.info("Closing weaviate client")
         self.client.close()
 
     def query_weaviate(self,query, query_vector,target_vector, query_properties,alpha=0.7,limit=10,ids=[],distance=0.40):

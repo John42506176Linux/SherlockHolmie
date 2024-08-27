@@ -63,8 +63,8 @@ def full_reddit_download(db_manager: WeaviateManager):
                 print(f"Error encountered: {future.exception()}")
 
 def main():
+    wv_manager = WeaviateManager()
     try:
-        wv_manager = WeaviateManager()
         log.info('Inserting Subreddit info into DB')
         # db_manager.insert_subreddit_info(os.getenv('SUBREDDIT'))
         log.info(f"Subreddit:{os.getenv('SUBREDDIT')}")
@@ -78,9 +78,7 @@ def main():
         embedder.bulk_embed_posts()
     except Exception as e:
         log.error(f'ERROR downloading reddit data:{e}')
-        raise Exception(e)
-    finally:
-        wv_manager.close()
+    wv_manager.close()
 
 if __name__ == '__main__':
     main()
