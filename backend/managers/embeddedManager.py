@@ -110,8 +110,6 @@ class WeaviateManager():
                     },
                     uuid=generate_uuid5(data_row['reddit_id'])
                 )
-                log.error(f"Colletion Failed objects: {self.reddit_collection.batch.failed_objects}")
-                log.error(f"Client Failed objects: {self.client.batch.failed_objects}")
             log.info(f"Num Errors: {batch.number_errors}")
             log.error(f"Collection Failed objects outside of loop: {self.reddit_collection.batch.failed_objects}")
             log.error(f"Client Failed objects outside of loop: {self.client.batch.failed_objects}")
