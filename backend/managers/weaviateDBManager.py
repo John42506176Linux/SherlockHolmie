@@ -9,6 +9,7 @@ from weaviate.classes.query import Sort, Filter
 from weaviate.util import generate_uuid5
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime,timezone
+from weaviate.classes.init import AdditionalConfig, Timeout
 
 
 log = logging.getLogger("WeaviateManager")
@@ -27,7 +28,10 @@ class WeaviateManager:
         try:
             client = weaviate.connect_to_wcs(
                 cluster_url=self.url,
-                auth_credentials=weaviate.auth.AuthApiKey(self.api_key)
+                auth_credentials=weaviate.auth.AuthApiKey(self.api_key),
+                additional_config=AdditionalConfig(
+                    timeout=Timeout(init=60, query=120, insert=720)  # Values in seconds
+                )
             )
             return client
         except Exception as e:

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from utilities.utils import embed_documents
 from tenacity import retry, stop_after_attempt
 import time
+from weaviate.classes.init import AdditionalConfig, Timeout
 
 
 log = logging.getLogger("bot")
@@ -61,7 +62,11 @@ class WeaviateManager():
         # Connect to a WCS instance
         self.client = weaviate.connect_to_wcs(
         cluster_url=URL,
-        auth_credentials=weaviate.auth.AuthApiKey(APIKEY))
+        auth_credentials=weaviate.auth.AuthApiKey(APIKEY),
+        additional_config=AdditionalConfig(
+            timeout=Timeout(init=60, query=120, insert=720)  # Values in seconds
+        )
+        )
         self.reddit_collection = self.client.collections.get("RedditDB")
     
     def bulk_insert_weaviate(self, posts):
