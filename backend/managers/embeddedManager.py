@@ -68,13 +68,23 @@ class WeaviateManager():
         # Assuming posts is a list of dictionaries
         log.info("Embedding posts")
         post_bodies = [f"{post['body']}" for post in posts]
+        log.info("Extracting post embeddings")
+        start_time = time.time()
         posts_vectors,word_embeddings = self.keywords_manager.custom_kw_model.extract_embeddings(post_bodies,vectorizer=self.keywords_manager.vectorizer)
+        log.info(f"Elapsed Time for post embedding: {time.time()-start_time}")
+        log.info("Extracting title embeddings")
+        start_time = time.time()
         title_vectors = self.embedder.embed([f"{post['title']}" for post in posts])
+        log.info(f"Elapsed Time for title embedding: {time.time()-start_time}")
         # posts
         log.info("Getting keywords")
+        start_time =  time.time()
         keywords = self.keywords_manager.get_keywords(post_bodies,doc_embeddings=posts_vectors,word_embeddings=word_embeddings)
+        log.info(f"Elapsed Time for keyword extraction: {time.time()-start_time}")
         log.info("Embedding keywords")
+        start_time = time.time()
         keyword_vectors = self.keywords_manager.embed_keywords()
+        log.info(f"Elapsed Time for keyword embedding: {time.time()-start_time}")
         log.info("Inserting into Weaviate")
         
         property_rows = [
@@ -99,7 +109,7 @@ class WeaviateManager():
         ]
         start_time = time.time()
 
-        with self.reddit_collection.batch.fixed_size(batch_size=1000) as batch:
+        with self.reddit_collection.batch.fixed_size(batch_size=1000,concurrent_requests=2)as batch:
             for i, data_row in enumerate(property_rows):
                 batch.add_object(
                     properties=data_row,
@@ -110,11 +120,14 @@ class WeaviateManager():
                     },
                     uuid=generate_uuid5(data_row['reddit_id'])
                 )
-            log.info(f"Num Errors: {batch.number_errors}")
-            log.error(f"Collection Failed objects outside of loop: {self.reddit_collection.batch.failed_objects}")
-            log.error(f"Client Failed objects outside of loop: {self.client.batch.failed_objects}")
+        failed_objs_a = self.reddit_collection.batch.failed_objects
+        if failed_objs_a:
+            log.info(f"Number of failed objects in the first batch: {len(failed_objs_a)}")
+            for i, failed_obj in enumerate(failed_objs_a, 1):
+                log.info(f"Failed object {i}:")
+                log.info(f"Error message: {failed_obj.message}")
+        log.info(f"Num Errors: {batch.number_errors}")
         log.info(f"Elapsed Insertion Time:{time.time()-start_time}")
         log.info("Batch completed")
-
 
 
