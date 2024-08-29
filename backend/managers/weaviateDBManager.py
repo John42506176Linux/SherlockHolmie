@@ -32,7 +32,7 @@ class WeaviateManager:
                 cluster_url=self.url,
                 auth_credentials=weaviate.auth.AuthApiKey(self.api_key),
                 additional_config=AdditionalConfig(
-                    ConnectionConfig(
+                    connection=ConnectionConfig(
                         session_pool_connections=30,
                         session_pool_maxsize=200,
                         session_pool_max_retries=3,
