@@ -16,6 +16,7 @@ from utilities.utils import embed_documents
 from tenacity import retry, stop_after_attempt
 import time
 from weaviate.classes.init import AdditionalConfig, Timeout
+from weaviate.config import ConnectionConfig
 
 
 log = logging.getLogger("bot")
@@ -61,12 +62,17 @@ class WeaviateManager():
         APIKEY = os.getenv("WCS_API_KEY")
         # Connect to a WCS instance
         self.client = weaviate.connect_to_wcs(
-        cluster_url=URL,
-        auth_credentials=weaviate.auth.AuthApiKey(APIKEY),
-        additional_config=AdditionalConfig(
-            timeout=Timeout(init=60, query=120, insert=720)  # Values in seconds
-        )
-        )
+                cluster_url=URL,
+                auth_credentials=weaviate.auth.AuthApiKey(APIKEY),
+                additional_config=AdditionalConfig(
+                    ConnectionConfig(
+                        session_pool_connections=30,
+                        session_pool_maxsize=200,
+                        session_pool_max_retries=3,
+                    ),
+                    timeout=Timeout(init=1440, query=1440, insert=1440)  # Values in seconds
+                )
+            )
         self.reddit_collection = self.client.collections.get("RedditDB")
     
     def bulk_insert_weaviate(self, posts):
@@ -114,7 +120,7 @@ class WeaviateManager():
         ]
         start_time = time.time()
 
-        with self.reddit_collection.batch.fixed_size(batch_size=1000,concurrent_requests=2)as batch:
+        with self.reddit_collection.batch.fixed_size(batch_size=300)as batch:
             for i, data_row in enumerate(property_rows):
                 batch.add_object(
                     properties=data_row,
@@ -123,7 +129,7 @@ class WeaviateManager():
                         "posts_vector": posts_vectors[i],
                         "keywords_vector": keyword_vectors[i],
                     },
-                    uuid=generate_uuid5(data_row['reddit_id'])
+                    uuid=generate_uuid5(data_row['ext_id'])
                 )
         failed_objs_a = self.reddit_collection.batch.failed_objects
         if failed_objs_a:

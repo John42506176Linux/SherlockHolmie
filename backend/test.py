@@ -275,9 +275,9 @@ def sequential_combine_results(query):
 
 # log.info(f'Test:{get_earliest_subreddit_post("ChoujinX") + timedelta(seconds=360)}')
 # # # Example usage:
-combined_sorted =sequential_combine_results("Who is the strongest Negator?")
+combined_sorted =sequential_combine_results("Who is the best Choujin?")
 
-for result_id, result_data in combined_sorted[-20:]:
+for result_id, result_data in combined_sorted[20:40]:
     print(f"ID: {result_id}")
     print(f"Body: {result_data['body']}")
     print(f"Permalink: {result_data['permalink']}")

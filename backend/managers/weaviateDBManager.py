@@ -10,6 +10,8 @@ from weaviate.util import generate_uuid5
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime,timezone
 from weaviate.classes.init import AdditionalConfig, Timeout
+from weaviate.config import ConnectionConfig
+
 
 
 log = logging.getLogger("WeaviateManager")
@@ -30,7 +32,12 @@ class WeaviateManager:
                 cluster_url=self.url,
                 auth_credentials=weaviate.auth.AuthApiKey(self.api_key),
                 additional_config=AdditionalConfig(
-                    timeout=Timeout(init=60, query=120, insert=720)  # Values in seconds
+                    ConnectionConfig(
+                        session_pool_connections=30,
+                        session_pool_maxsize=200,
+                        session_pool_max_retries=3,
+                    ),
+                    timeout=Timeout(init=1440, query=1440, insert=1440)  # Values in seconds
                 )
             )
             return client
