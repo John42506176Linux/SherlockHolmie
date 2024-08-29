@@ -129,7 +129,7 @@ class WeaviateManager():
                         "posts_vector": posts_vectors[i],
                         "keywords_vector": keyword_vectors[i],
                     },
-                    uuid=generate_uuid5(data_row['ext_id'])
+                    uuid=generate_uuid5(data_row['reddit_id'])
                 )
         failed_objs_a = self.reddit_collection.batch.failed_objects
         if failed_objs_a:
