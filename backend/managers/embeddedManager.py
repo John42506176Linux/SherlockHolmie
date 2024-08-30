@@ -120,7 +120,7 @@ class WeaviateManager():
         ]
         start_time = time.time()
 
-        with self.reddit_collection.batch.fixed_size(batch_size=300)as batch:
+        with self.reddit_collection.batch.fixed_size(batch_size=50)as batch:
             for i, data_row in enumerate(property_rows):
                 batch.add_object(
                     properties=data_row,
