@@ -173,6 +173,7 @@ class PainPointClusterItem(BaseModel):
     score:int  = Field(description="The score of the post/comment of the post.")
     time:str = Field(description="The time of quote")
     link:str = Field(description="The link to the quote")
+    reddit_id: str = Field(description="The id of the post")
     persona:Optional[str] = Field(description="The assigned persona of the pain point")
         
 class PainPointCluster(BaseModel):
@@ -184,6 +185,7 @@ class PainPointCluster(BaseModel):
     description: str = Field(description="Brief description of the common issue (1-4 sentences)")
     percentage:float = Field(descripiton="The percentage of cluster items under this")
     sub_pain_points: List[PainPointClusterItem] = Field(description="A list of the sub pain points for this cluster")
+    reddit_id: str = Field(description="The id of the post")
 
 class ValidPersonaCluster(BaseModel):
     title: str = Field(..., description="Concise representative title (3-7 words)")
@@ -205,6 +207,7 @@ class PersonaClusterItem(BaseModel):
     score:Optional[int]  = Field(None,description="The score of the post/comment of the post.")
     time:Optional[str] = Field(None,description="The time of quote")
     link:str = Field(description="The link to the quote")
+    reddit_id: str = Field(description="The id of the post")
         
 class PersonaCluster(BaseModel):
     title: str = Field(description="Concise Persona title (3-7 words)")
@@ -214,6 +217,7 @@ class PersonaCluster(BaseModel):
     link:str = Field(description="The link to the quote")
     description: str = Field(description="Brief description of the persona (1-4 sentences)")
     percentage:float = Field(descripiton="The percentage of cluster items under this")
+    reddit_id: str = Field(description="The id of the post")
     sub_personas: List[PersonaClusterItem] = Field(description="A list of the sub personas for this cluster")
     top_pain_points: List[PainPointCluster] = Field(description="A list of the top pain points for this cluster")
 

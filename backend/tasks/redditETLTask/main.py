@@ -20,7 +20,7 @@ log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
 log.addHandler(logging.StreamHandler())
 
-load_dotenv()
+load_dotenv(override=True)
 
 def full_reddit_download(db_manager: WeaviateManager):
     subreddit = os.getenv('SUBREDDIT')
@@ -66,7 +66,6 @@ def main():
     wv_manager = WeaviateManager()
     try:
         log.info('Inserting Subreddit info into DB')
-        # db_manager.insert_subreddit_info(os.getenv('SUBREDDIT'))
         log.info(f"Subreddit:{os.getenv('SUBREDDIT')}")
         log.info("Starting reddit download")
         full_reddit_download(wv_manager)
@@ -74,7 +73,7 @@ def main():
         processor = RedditDataProcessor()
         processor.process_data()
         log.info('Finished Filtering Data')
-        embedder = RedditEmbedder()
+        embedder = RedditEmbedder(wv_manager=wv_manager)
         embedder.bulk_embed_posts()
     except Exception as e:
         log.error(f'ERROR downloading reddit data:{e}')

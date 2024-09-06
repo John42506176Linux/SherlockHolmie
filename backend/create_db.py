@@ -6,12 +6,13 @@ from managers.databaseManager import DatabaseManager
 import weaviate.classes as wvc
 import requests
 import json
+from weaviate.classes.config import Configure
 
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
 log.addHandler(logging.StreamHandler())
 
-load_dotenv()
+load_dotenv(override=True)
 # Set these environment variables
 URL = os.getenv("WCS_URL")
 APIKEY = os.getenv("WCS_API_KEY")
@@ -66,6 +67,10 @@ try :
             wvc.config.Property(name="reddit_id", data_type=wvc.config.DataType.TEXT),
             wvc.config.Property(name="body", data_type=wvc.config.DataType.TEXT),
         ],
+        replication_config=Configure.replication(
+            factor=3,
+            async_enabled=True,
+        )
     )
 except Exception as e:
     log.error(f"Error creating collection: {e}")

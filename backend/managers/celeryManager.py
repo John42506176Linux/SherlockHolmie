@@ -2,6 +2,8 @@ from celery import Celery
 import logging
 import time
 from managers.databaseManager import DatabaseManager
+from managers.weaviateDBManager import WeaviateManager
+
 from managers.reportManager import ReportManager
 import os 
 import requests
@@ -18,8 +20,9 @@ log = logging.getLogger("bot")
 
 @app.task
 def process_space_task(params):
+    wv_manager = WeaviateManager()
     start_time = time.time()
-    report_manager = ReportManager(DatabaseManager())
+    report_manager = ReportManager(wv_manager)
     log.info("Database Manager created")
     try:
         log.info(f"Initializing Space: {params['space']}")
@@ -47,7 +50,8 @@ def process_space_task(params):
 
         result = {
             "Pain Points": pain_points_dict,
-            "Personas": personas_dict
+            "Personas": personas_dict,
+            "Ids": [report_manager.ids]
         }
 
         # Send result to Next.js API
@@ -56,3 +60,5 @@ def process_space_task(params):
     except Exception as e:
         log.error(f"Error processing space: {e}")
         return {"error": str(e)}
+    finally:
+        wv_manager.close()

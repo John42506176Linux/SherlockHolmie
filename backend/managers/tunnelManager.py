@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 class TunnelManager:
     def __init__(self):
-        load_dotenv()
+        load_dotenv(override=True)
         self.server = None
         self.SSH_HOST = os.getenv('SSH_HOST')
         self.SSH_PORT = int(os.getenv('SSH_PORT', 22))

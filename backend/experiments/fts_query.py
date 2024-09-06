@@ -12,7 +12,7 @@ log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
 log.addHandler(logging.StreamHandler())
 
-load_dotenv()
+load_dotenv(override=True)
 
 db_manager = DatabaseManager()
 log.info("Database Manager created")

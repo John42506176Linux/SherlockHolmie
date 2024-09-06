@@ -125,6 +125,7 @@ class ReportManager:
         self.openai_prompts = openai_prompts.OpenAIPrompts()
         self.max_retries = 5
         self.reranked_rows_dict = {}
+        self.ids = []
 
     def _get_emotion_value(self,emotion,emotion_values):
         try:
@@ -180,37 +181,37 @@ class ReportManager:
             {format_instructions}
             """,
         )
-        HYDE_PROMPT = PromptTemplate(
-            input_variables=["question", "objective"],
-            partial_variables={"format_instructions": hyde_json_parser.get_format_instructions()},
-            template="""You are an AI language model assistant. Your task is to generate a hypothetical Reddit post based on the given user question. The goal is to create a post that sounds authentic and engaging, which will help in improving the retrieval of relevant documents from a vector database.
+        # HYDE_PROMPT = PromptTemplate(
+        #     input_variables=["question", "objective"],
+        #     partial_variables={"format_instructions": hyde_json_parser.get_format_instructions()},
+        #     template="""You are an AI language model assistant. Your task is to generate a hypothetical Reddit post based on the given user question. The goal is to create a post that sounds authentic and engaging, which will help in improving the retrieval of relevant documents from a vector database.
 
-            The original question is: {question}
-            The business objective is: {objective}
+        #     The original question is: {question}
+        #     The business objective is: {objective}
             
-            Ensure that the post reflects a conversational tone typically found in Reddit posts, but do not use the word reddit. Feel free to use different ways of expressing the idea or similar terms that might be used in real Reddit discussions.
-            Provide the hypothetical Reddit post in valid JSON. ONLY JSON.
+        #     Ensure that the post reflects a conversational tone typically found in Reddit posts, but do not use the word reddit. Feel free to use different ways of expressing the idea or similar terms that might be used in real Reddit discussions.
+        #     Provide the hypothetical Reddit post in valid JSON. ONLY JSON.
             
-            {format_instructions}
-            """
-        )
+        #     {format_instructions}
+        #     """
+        # )
         query_llm_chain = QUERY_PROMPT | self.sonnet_llm | query_json_parser
-        hyde_llm_chain = HYDE_PROMPT | self.openai_creative_llm_json | hyde_json_parser
+        # hyde_llm_chain = HYDE_PROMPT | self.openai_creative_llm_json | hyde_json_parser
         multiquery_resp = query_llm_chain.invoke(input={
             'space':space,
             'perspective':perspective,
             'objective': context
         })
-        hyde_input_list = []
-        for resp in multiquery_resp['query']:
-            log.info(f"Query:{resp}")
-            hyde_input_list.append({
-                'question': resp,
-                'objective': context
-            })
-        hyde_resp = hyde_llm_chain.batch(hyde_input_list,config={"max_concurrency": 5,"callbacks": [BatchCallback(len(hyde_input_list))]})
-        hyde_queries = [resp['hyde'] for resp in hyde_resp]
-        return (hyde_queries,multiquery_resp['query'])
+        # hyde_input_list = []
+        # for resp in multiquery_resp['query']:
+        #     log.info(f"Query:{resp}")
+        #     hyde_input_list.append({
+        #         'question': resp,
+        #         'objective': context
+        #     })
+        # hyde_resp = hyde_llm_chain.batch(hyde_input_list,config={"max_concurrency": 5,"callbacks": [BatchCallback(len(hyde_input_list))]})
+        # hyde_queries = [resp['hyde'] for resp in hyde_resp]
+        return multiquery_resp['query']
 
     def initialize_space(self,space,perspective,perspective_specific,context,fast=True,threshold=0.55):
         if self.space_info is not None:
@@ -220,8 +221,8 @@ class ReportManager:
         self.perspective=perspective
         self.context=context
         log.info(f"Space:{self.space} Perspective:{self.perspective} Context:{self.context}")
-        hyde_resps,multi_queries = self.multi_query_generator(space,perspective,context)
-        space_info  = self.wv_manager.search_multiple_queries(hyde_resps)
+        multi_queries = self.multi_query_generator(space,perspective,context)
+        space_info  = self.wv_manager.search_multiple_queries(multi_queries)
         
         log.info(f"Space Info:{len(space_info)}")
 
@@ -246,22 +247,23 @@ class ReportManager:
         self.top_texts = [row['body'] for row in self.space_info]
         self.perspective = perspective
         self.context = context
+        self.ids = [row['id'] for row in self.space_info]
     
     def full_rerank(self,rows, queries, batch_size=512, max_workers=10, perspective_specific=True):
-        fast_rows = self.batch_rerank(
-            os.getenv('AWS_SMALL_RERANK_MODEL'),
-            rows,
-            queries,
-            threshold=0.0005,
-            batch_size=batch_size,
-            max_workers=max_workers,
-            max_posts=float('inf')
-        )
+        # fast_rows = self.batch_rerank(
+        #     os.getenv('AWS_SMALL_RERANK_MODEL'),
+        #     rows,
+        #     queries,
+        #     threshold=0.0005,
+        #     batch_size=batch_size,
+        #     max_workers=max_workers,
+        #     max_posts=float('inf')
+        # )
         if perspective_specific:
             space_rows = self.batch_rerank(
                 os.getenv('AWS_RERANK_MODEL'),
-                fast_rows,
-                queries,
+                rows,
+                queries[:5],
                 threshold=0.20, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
@@ -271,12 +273,12 @@ class ReportManager:
         else:
             return self.batch_rerank(
                 os.getenv('AWS_RERANK_MODEL'),
-                fast_rows,
+                rows,
                 queries[:5],
-                threshold=0.20, 
+                threshold=0.25, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
-                max_posts=5000)
+                max_posts=10000)[:1000]
 
 
     def batch_rerank(self,model,rows, queries, threshold=0.50, batch_size=1000, max_workers=10, max_posts=100):
@@ -303,7 +305,7 @@ class ReportManager:
 
         for i in tqdm(range(0, len(rows), batch_size), desc="Processing Batches"):
             batch = rows[i:i+batch_size]
-            texts = [f'Subreddit:{row["subreddit_name"]} Title:{row['title']} Post: {row["body"]}' for row in batch]
+            texts = [f'Subreddit:{row["subreddit_name"]} Title:{row["title"]} Post: {row["body"]}' for row in batch]
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_query = {executor.submit(send_request, query, texts): query for query in queries}
                 for future in as_completed(future_to_query):
@@ -648,7 +650,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
         
-        chain = chat_template | self.openai_big_llm | parser
+        chain = chat_template | self.openai_small_llm_json | parser
         log.info("Starting Batch Pain Points")
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(queries))]})
@@ -958,6 +960,7 @@ class ReportManager:
                             score=topic_dict[idx]['score'],
                             link=topic_dict[idx]['link'],
                             time=topic_dict[idx]['time'],
+                            reddit_id = topic_dict[idx]['id']
                         )
                     )
 
@@ -968,6 +971,7 @@ class ReportManager:
                         title=valid_cluster['title'],
                         quote=valid_cluster['quote'],
                         score=self.reranked_rows_dict[valid_cluster['quoteId']]['score'],
+                        reddit_id=valid_cluster['quoteId'],
                         link='https://www.reddit.com' + self.reranked_rows_dict[valid_cluster['quoteId']]['permalink'],
                         time=self.reranked_rows_dict[valid_cluster['quoteId']]['created_utc'].strftime('%Y-%m-%d'),
                         description=valid_cluster['description'],
@@ -1025,6 +1029,7 @@ class ReportManager:
                         score=clusters[0].score,
                         link=clusters[0].link,
                         time=clusters[0].time,
+                        reddit_id =  clusters[0].reddit_id,
                         description=clusters[0].description,
                         sub_personas=[item for cluster in clusters for item in cluster.sub_personas],
                         percentage=sum(cluster.percentage for cluster in clusters),
@@ -1075,7 +1080,9 @@ class ReportManager:
                                 score=topic_dict[idx]['score'],
                                 link=topic_dict[idx]['link'],
                                 time=topic_dict[idx]['time'],
+                                reddit_id=topic_dict[idx]['id'],
                                 persona=topic_dict[idx]['persona']  
+
                             )
                         )
                     except Exception as e:
@@ -1092,6 +1099,7 @@ class ReportManager:
                         time=self.reranked_rows_dict[valid_cluster['quoteId']]['created_utc'].strftime('%Y-%m-%d'),
                         description=valid_cluster['description'],
                         sub_pain_points=sub_pain_points,
+                        reddit_id=valid_cluster['quoteId'],
                         percentage=percentage  # Adding the percentage of items in this cluster
                     )
                 )
@@ -1135,6 +1143,7 @@ class ReportManager:
                         score=clusters[0].score,
                         link=clusters[0].link,
                         time=clusters[0].time,
+                        reddit_id = clusters[0].reddit_id,
                         description=clusters[0].description,
                         sub_pain_points=[item for cluster in clusters for item in cluster.sub_pain_points],
                         percentage=sum(cluster.percentage for cluster in clusters)
@@ -1363,6 +1372,7 @@ class ReportManager:
                             link=cluster.link,
                             description=f"Common issue found in {count} out of {total_persona_points} pain points for {persona.title}",
                             percentage=percentage,
+                            reddit_id=cluster.reddit_id,
                             sub_pain_points=top_sub_points
                         )
                         top_clusters_info.append(cluster_obj)

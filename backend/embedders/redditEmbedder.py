@@ -3,21 +3,17 @@ import numpy as np
 import time
 import pyarrow.parquet as pq
 from tqdm import tqdm
-from models.models import RedditPost
-from datetime import datetime
-from managers.databaseManager import DatabaseManager
-from managers.embeddedManager import CustomEmbedder,KeywordManager,WeaviateManager
+from managers.embeddedManager import CustomEmbedder
 import logging
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
+from managers.weaviateDBManager import WeaviateManager
 import os
 
 class RedditEmbedder:
-    def __init__(self, model= os.getenv('AWS_EMBEDDING_MODEL'), dimensions=512, show_progress_bar=True, max_retries=5, retry_max_seconds=120):
+    def __init__(self, wv_manager: WeaviateManager, model= os.getenv('AWS_EMBEDDING_MODEL'), dimensions=512, show_progress_bar=True, max_retries=5, retry_max_seconds=120):
         self.log = logging.getLogger("bot")
         self.embedder = CustomEmbedder(model_name=model,dimensions=dimensions)
-        self.keywords_manager = KeywordManager()
-        self.wv_manager = WeaviateManager()
+        self.wv_manager = wv_manager
 
     @staticmethod
     def process_embedding(bs):

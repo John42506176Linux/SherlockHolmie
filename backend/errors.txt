@@ -1,0 +1,19 @@
+Query Errors:
+
+UNKNOWN:Error received from peer  {grpc_message:"upstream connect error or disconnect/reset before headers. reset reason: connection termination", grpc_status:14, created_time:"2024-08-31T18:04:56.352157765+00:00
+Query call with protocol GRPC search failed with message <AioRpcError of RPC that terminated with:
+        status = StatusCode.DEADLINE_EXCEEDED
+        details = "Deadline Exceeded"
+        debug_error_string = "UNKNOWN:Error received from peer  {created_time:"2024-08-31T21:48:30.7923342+00:00", grpc_status:4, grpc_message:"Deadline Exceeded"}"
+Error querying Weaviate: Query call with protocol GRPC search failed with message <AioRpcError of RPC that terminated with:
+        status = StatusCode.UNAVAILABLE
+        details = "Received http2 header with status: 502"
+        debug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"Received http2 header with status: 502", grpc_status:14, created_time:"2024-08-31T21:56:12.8879035+00:00"}" 
+>.
+
+Error querying Weaviate: Query call with protocol GRPC search failed with message <AioRpcError of RPC that terminated with:
+        status = StatusCode.UNAVAILABLE
+        details = "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+        debug_error_string = "UNKNOWN:Error received from peer  {created_time:"2024-08-31T21:57:36.0623571+00:00", grpc_status:14, grpc_message:"upstream connect error or disconnect/reset before headers. reset reason: connection termination"}"
+
+weaviate.exceptions.UnexpectedStatusCodeError: Meta endpoint! Unexpected status code: 503, with response body: None.
