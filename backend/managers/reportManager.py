@@ -320,7 +320,7 @@ class ReportManager:
                                 if score > all_reranked[doc_id]["max_score"]:
                                     all_reranked[doc_id] = {
                                         **original_row,
-                                        "value": f'Subreddit:{original_row["subreddit_name"]} Title:{extract_post_slug(original_row["permalink"])} Post: {original_row["body"][:2000]}',
+                                        "value": f'Subreddit:{original_row["subreddit_name"]} Title:{original_row["title"]} Post: {original_row["body"][:2000]}',
                                         "max_score": score,
                                         "best_query": query
                                     }
