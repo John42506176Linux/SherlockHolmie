@@ -249,7 +249,7 @@ class WeaviateManager:
     
     def search_multi_threaded_multiple_queries(self, queries):
         results = {}
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_query = {executor.submit(self.sequential_combine_results, query): query for query in queries}
 
             for future in as_completed(future_to_query):

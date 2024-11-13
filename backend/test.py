@@ -14,6 +14,12 @@ from weaviate.classes.init import AdditionalConfig, Timeout
 from weaviate.config import ConnectionConfig
 from managers.weaviateDBManager import WeaviateManager
 import time
+from langchain_core.prompts.prompt import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from models.llm_models import *
+from langchain_community.chat_models import ChatOpenAI
+
 
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
@@ -24,6 +30,7 @@ load_dotenv(override=True)
 URL = os.getenv("WCS_URL")
 print(f"URL:{URL}")
 APIKEY = os.getenv("WCS_API_KEY")
+print("API KEY:",APIKEY)
 wv_manager = WeaviateManager()
 
 
@@ -275,7 +282,38 @@ wv_manager = WeaviateManager()
 
 # log.info(f'Test:{get_earliest_subreddit_post("ChoujinX") + timedelta(seconds=360)}')
 # # # Example usage:
-combined_sorted =wv_manager.sequential_combine_results("What are the problems tech CEO's have with healthy eating?")
+hyde_json_parser=JsonOutputParser(pydantic_object=HydeResp)
+query  = "How much do bay area residents tend to pay in Home chefs?"
+HYDE_PROMPT = PromptTemplate(
+        input_variables=["question", "objective"],
+        partial_variables={"format_instructions": hyde_json_parser.get_format_instructions()},
+        template="""You are an AI language model assistant. Your task is to generate a hypothetical Reddit post based on the given user question. The goal is to create a post that sounds authentic and engaging, which will help in improving the retrieval of relevant documents from a vector database.
+
+        The original question is: {question}
+        The business objective is: {objective}
+        
+        Ensure that the post reflects a conversational tone typically found in Reddit posts, but do not use the word reddit. Feel free to use different ways of expressing the idea or similar terms that might be used in real Reddit discussions.
+        Provide the hypothetical Reddit post in valid JSON. ONLY JSON.
+        
+        {format_instructions}
+        """
+
+        )
+openai_creative_llm_json =  ChatOpenAI(temperature=0, model="gpt-4o-mini").bind(response_format={ "type": "json_object" }).with_retry(
+            wait_exponential_jitter=True, # Add jitter to the exponential backoff
+            stop_after_attempt=10, # Try twice
+        )
+context = "How much are potential customers willing to pay for in home chef services?"
+hyde_llm_chain = HYDE_PROMPT | openai_creative_llm_json | hyde_json_parser
+hyde_resp = hyde_llm_chain.invoke({
+                'question': query,
+                'objective': context
+            })['hyde']
+print(hyde_resp)
+combined_sorted = wv_manager.sequential_combine_results(hyde_resp)
+# combined_sorted = wv_manager.reddit_collection.query.fetch_objects(limit=20)
+# for o in combined_sorted.objects:
+#     print(o.properties)
 for result_id, result_data in combined_sorted[:20]:
     print(f"ID: {result_id}")
     print(f"Body: {result_data['body']}")

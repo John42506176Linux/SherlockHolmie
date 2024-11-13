@@ -18,6 +18,7 @@ class KeywordManager():
 
     def get_keywords(self, documents,doc_embeddings=None,word_embeddings=None):
         try:
+            log.info("Extracting keywords")
             keywords = self.custom_kw_model.extract_keywords(documents,doc_embeddings=doc_embeddings,word_embeddings=word_embeddings, vectorizer=self.vectorizer,use_mmr=True,diversity=0.5)
             self.keywords = keywords
             return keywords

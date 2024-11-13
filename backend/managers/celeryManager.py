@@ -51,7 +51,7 @@ def process_space_task(params):
         result = {
             "Pain Points": pain_points_dict,
             "Personas": personas_dict,
-            "Ids": [report_manager.ids]
+            "Ids": report_manager.ids
         }
 
         # Send result to Next.js API

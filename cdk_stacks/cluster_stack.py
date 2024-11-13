@@ -11,14 +11,14 @@ import boto3
 from constructs import Construct
 from dotenv import load_dotenv
 import os
-load_dotenv()
+load_dotenv(override=True)
 
-db_username = os.getenv('DB_USERNAME')
-db_password=os.getenv('DB_PASSWORD')
-db_host=os.getenv('DB_HOST')
-db_port=os.getenv('DB_PORT')
-db_database=os.getenv('DB_DATABASE')
 openai_api_key=os.getenv('OPENAI_API_KEY')
+wcs_api_key = os.getenv('WCS_API_KEY')
+wcs_url =  os.getenv('WCS_URL')
+print("WCS URL: ", wcs_url)
+embedding_url =  'http://ec2-35-90-19-128.us-west-2.compute.amazonaws.com:7997'
+embedding_model = os.getenv('AWS_EMBEDDING_MODEL')
 
 def get_latest_image_tag(repository_name):
             client = boto3.client('ecr', region_name='us-west-2')
@@ -27,6 +27,9 @@ def get_latest_image_tag(repository_name):
                 filter={'tagStatus': 'TAGGED'},
                 maxResults=1,
             )
+            print("Repository Name: ", repository_name)
+            print("Tag: ", response['imageDetails'][0]['imageTags'][0])
+            print("Response: ", response)
             return response['imageDetails'][0]['imageTags'][0]
 
 class ClusterStack(core.Stack):
@@ -36,7 +39,7 @@ class ClusterStack(core.Stack):
         
         # Create a ECS cluster
         self.cluster = ecs.Cluster(self, 'RedditDownloadCluster', vpc=vpc.vpc)
-
+        latest_image_tag = '2a24cd9'
         # Create an IAM role for the Fargate task to allow it to execute
         task_role = iam.Role(
             self,
@@ -66,16 +69,15 @@ class ClusterStack(core.Stack):
         log_group = logs.LogGroup(self, 'RedditETLLogGroup',
             retention=logs.RetentionDays.ONE_WEEK
         )
-        latest_image_tag = get_latest_image_tag('sherlockholmie')
+       
         self.task_definition.add_container('RedditContainer',
             image=ecs.RepositoryImage.from_registry(f'791346673593.dkr.ecr.us-west-2.amazonaws.com/sherlockholmie:{latest_image_tag}'),
             logging=ecs.LogDriver.aws_logs(stream_prefix='RedditETL', log_group=log_group),
             environment={
-                'DB_HOST': db_host,
-                'DB_PORT' : db_port,
-                'DB_DATABASE': db_database,
-                'DB_USERNAME' : db_username,
-                'DB_PASSWORD' : db_password,
-                'OPENAI_API_KEY': openai_api_key
+                'OPENAI_API_KEY': openai_api_key,
+                'WCS_API_KEY' : wcs_api_key,
+                'WCS_URL': wcs_url,
+                'AWS_EMBEDDING_URL': embedding_url,
+                'AWS_EMBEDDING_MODEL': embedding_model,
             },
         )

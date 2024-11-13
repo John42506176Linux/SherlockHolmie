@@ -40,6 +40,7 @@ import requests
 import hdbscan
 import numpy as np
 import os
+import time
 from langchain_openai import OpenAIEmbeddings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -68,27 +69,27 @@ class ReportManager:
         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_VIOLENCE: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
-        },).bind(generation_config={ "response_mime_type": "application/json"}).with_retry(
+        },).with_retry(
             # retry_if_exception_type=(ValueError,), # Retry only on ValueError
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
             stop_after_attempt=10, # Try twice
         ) # TODO: Create an LLM class
-        self.fast_llm = ChatBedrock(
-            model_id="anthropic.claude-3-sonnet-20240229-v1:0",
-            model_kwargs={"temperature": 0},
-        ).with_retry(
-            # retry_if_exception_type=(ValueError,), # TODO: Figure out with errors to retry on
-            wait_exponential_jitter=True, # Add jitter to the exponential backoff
-            stop_after_attempt=10, # Try twice
-        )
         self.flash_gemini_llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest",safety_settings={
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_VIOLENCE: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
-        },).bind(generation_config={ "response_mime_type": "application/json"})
+        },).bind(generation_config={ "response_mime_type": "application/json"}).with_retry(
+            # retry_if_exception_type=(ValueError,), # TODO: Figure out with errors to retry on
+            wait_exponential_jitter=True, # Add jitter to the exponential backoff
+            stop_after_attempt=30, # Try twice
+        )
         
-        self.openai_big_llm = ChatOpenAI(temperature=0, model="gpt-4o").bind(response_format={ "type": "json_object" }).with_retry(
+        self.openai_big_llm = ChatOpenAI(temperature=0, model="gpt-4o-2024-08-06").bind(response_format={ "type": "json_object" }).with_retry(
+            wait_exponential_jitter=True, # Add jitter to the exponential backoff
+            stop_after_attempt=30, # Try twice
+        )
+        self.openai_repr_llm = ChatOpenAI(temperature=0, model="gpt-4o-2024-05-13").bind(response_format={ "type": "json_object" }).with_retry(
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
             stop_after_attempt=30, # Try twice
         )
@@ -181,49 +182,50 @@ class ReportManager:
             {format_instructions}
             """,
         )
-        # HYDE_PROMPT = PromptTemplate(
-        #     input_variables=["question", "objective"],
-        #     partial_variables={"format_instructions": hyde_json_parser.get_format_instructions()},
-        #     template="""You are an AI language model assistant. Your task is to generate a hypothetical Reddit post based on the given user question. The goal is to create a post that sounds authentic and engaging, which will help in improving the retrieval of relevant documents from a vector database.
+        HYDE_PROMPT = PromptTemplate(
+            input_variables=["question", "objective"],
+            partial_variables={"format_instructions": hyde_json_parser.get_format_instructions()},
+            template="""You are an AI language model assistant. Your task is to generate a hypothetical Reddit post based on the given user question. The goal is to create a post that sounds authentic and engaging, which will help in improving the retrieval of relevant documents from a vector database.
 
-        #     The original question is: {question}
-        #     The business objective is: {objective}
+            The original question is: {question}
+            The business objective is: {objective}
             
-        #     Ensure that the post reflects a conversational tone typically found in Reddit posts, but do not use the word reddit. Feel free to use different ways of expressing the idea or similar terms that might be used in real Reddit discussions.
-        #     Provide the hypothetical Reddit post in valid JSON. ONLY JSON.
+            Ensure that the post reflects a conversational tone typically found in Reddit posts, but do not use the word reddit. Feel free to use different ways of expressing the idea or similar terms that might be used in real Reddit discussions.
+            Provide the hypothetical Reddit post in valid JSON. ONLY JSON.
             
-        #     {format_instructions}
-        #     """
-        # )
+            {format_instructions}
+            """
+        )
         query_llm_chain = QUERY_PROMPT | self.sonnet_llm | query_json_parser
-        # hyde_llm_chain = HYDE_PROMPT | self.openai_creative_llm_json | hyde_json_parser
+        hyde_llm_chain = HYDE_PROMPT | self.flash_gemini_llm  | hyde_json_parser
         multiquery_resp = query_llm_chain.invoke(input={
             'space':space,
             'perspective':perspective,
             'objective': context
         })
-        # hyde_input_list = []
-        # for resp in multiquery_resp['query']:
-        #     log.info(f"Query:{resp}")
-        #     hyde_input_list.append({
-        #         'question': resp,
-        #         'objective': context
-        #     })
-        # hyde_resp = hyde_llm_chain.batch(hyde_input_list,config={"max_concurrency": 5,"callbacks": [BatchCallback(len(hyde_input_list))]})
-        # hyde_queries = [resp['hyde'] for resp in hyde_resp]
-        return multiquery_resp['query']
+        hyde_input_list = []
+        for resp in multiquery_resp['query']:
+            log.info(f"Query:{resp}")
+            hyde_input_list.append({
+                'question': resp,
+                'objective': context
+            })
+        hyde_resp = hyde_llm_chain.batch(hyde_input_list,config={"max_concurrency": 5,"callbacks": [BatchCallback(len(hyde_input_list))]})
+        hyde_queries = [resp['hyde'] for resp in hyde_resp]
+        return multiquery_resp['query'],hyde_queries
 
     def initialize_space(self,space,perspective,perspective_specific,context,fast=True,threshold=0.55):
         if self.space_info is not None:
             log.error("Space already initialized")
             return None
         self.space = space
-        self.perspective=perspective
-        self.context=context
+        self.perspective = perspective
+        self.context = context
         log.info(f"Space:{self.space} Perspective:{self.perspective} Context:{self.context}")
-        multi_queries = self.multi_query_generator(space,perspective,context)
-        space_info  = self.wv_manager.search_multiple_queries(multi_queries)
-        
+        multi_queries,hyde_queries = self.multi_query_generator(space,perspective,context)
+        start_time = time.time()
+        space_info  = self.wv_manager.search_multi_threaded_multiple_queries(hyde_queries)
+        log.info(f"Search Time:{time.time()-start_time}")
         log.info(f"Space Info:{len(space_info)}")
 
         self.space_info = self.full_rerank(space_info, multi_queries, batch_size=512, max_workers=10, perspective_specific=perspective_specific)
@@ -264,7 +266,7 @@ class ReportManager:
                 os.getenv('AWS_RERANK_MODEL'),
                 rows,
                 queries[:5],
-                threshold=0.20, 
+                threshold=0, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
                 max_posts=float('inf'))[:10000]
@@ -278,7 +280,7 @@ class ReportManager:
                 threshold=0.25, 
                 batch_size=batch_size, 
                 max_workers=max_workers, 
-                max_posts=10000)[:1000]
+                max_posts=float('inf'))[:1000]
 
 
     def batch_rerank(self,model,rows, queries, threshold=0.50, batch_size=1000, max_workers=10, max_posts=100):
@@ -345,12 +347,16 @@ class ReportManager:
     def llm_rerank(self,rows):
         posts = []
         subreddits = []
+        titles = []
+        is_posts = []
         llm_reranked_rows = []
         for i, post in enumerate(rows, 1):
             posts.append(post['body'])
             subreddits.append(post['subreddit_name'])
+            titles.append(post['title'])
+            is_posts.append(post['is_post'])
 
-        results = self._analyze_reddit_posts(posts, subreddits)
+        results = self._analyze_reddit_posts(posts, subreddits,titles,is_posts)
         log.info("Posts Analyzed")
 
         for i, (post, analysis_result) in enumerate(zip(rows, results), 1):
@@ -363,189 +369,272 @@ class ReportManager:
                 llm_reranked_rows.append(post)
         return llm_reranked_rows
 
-    def _analyze_reddit_posts(self,posts: List[str], subreddits: List[str]):
+    def _analyze_reddit_posts(self,posts: List[str], subreddits: List[str],titles: List[str],is_posts: List[bool]):
         # Run the chain
         parser = ErrorJsonParser(json_parser=JsonOutputParser(pydantic_object=RedditPostAnalysis))
 
         # Define the prompt template
         prompt_template = """
-        Your task is to analyze Reddit posts for relevance to a given space and perspective. Here are some examples:
-
-        Example 2:
-        Reddit Post: "The James Webb Space Telescope images are mind-blowing! I never thought I'd see such detailed pictures of distant galaxies in my lifetime."
-        Space: Space Science
-        Perspective: Astronomer
-        Subreddit: space
-        Analysis:
-        {{
-        "space_match": true,
-        "perspective_match": false
-        }}
-
-        Example 3:
-        Reddit Post: "As a software engineer, I'm fascinated by the latest developments in quantum computing. The potential for revolutionizing cryptography is huge!"
-        Space: Space Science
-        Perspective: Software Engineer
-        Subreddit: programming
-        Analysis:
-        {{
-        "space_match": false,
-        "perspective_match": true
-        }}
-
-
-        Example 4:
-        Reddit Post: "IMO as a manager you need to think staff first patients second so that your staff are able to put patients first"
-        Space: Nursing Homes in the UK
-        Perspective: Nursing Home Manager
-        Subreddit: NursingUK
-        Analysis:
-        {{
-        "space_match": false,
-        "perspective_match": false
-        }}
-
-        Example 5:
-        Reddit Post: "From a managers point of view it's difficult. They were supposed to be additional, to 'free up' band 5s for 'more complex tasks' but this hasn't happened. I have to have 1 NA on the ward but that means I have to sacrifice an RN position. 
-
-        So I've had to have one and put them on the rota but they have to run a bay, which means I or the charge nurse that day has to oversee them because technically NA are not supposed to actually 'plan care' just help deliver it, and they're not supposed to do IVs and other things (lots of trusts will be scaling back what they've allowed NA to do in the coming months as they've far surpassed what they were originally for). 
-
-        They're fabulous at what they do but the restrictions to the role are causing problems because the role is being used in the wrong way. Before the role came out lots of us replied to the consultation saying they would be used instead of RN and replace them. We were told we were being silly. Well wel well."
-        Space: Nursing Homes in the UK
-        Perspective: Nursing Home Manager
-        Subreddit: NursingUK
-        Analysis:
-        {{
-        "space_match": false,
-        "perspective_match": false
-        }}
-
-        Example 6:
-        Reddit Post: "Hello,
-
-        Thank you very much for the detailed response. I super appreciate the time you took to write it. 
-
-        I should have clearly stated from the beginning for Buyers to order their own Inspections. 
-
-        I’m in California too. We checked the box for Buyers to pay inspections to make their offer stronger, since there two other offers on the table. 
-
-        I should have clarified with listing agent whether they had inspections available or not prior to writing offer. 
-
-        If the listing agent ordered inspections during the listing period, and the reports happened to be available right after we were in contract, I should have just used those as additional inspections, and not Buyer’s main inspections. Did I understand that right?"
-
-        Space: Real Estate Agents and Inspection Reports
-        Perspective: Home Buyer
-        Subreddit: realtors
-        Analysis:
-        {{
-        "space_match": false,
-        "perspective_match": false
-        }}
-
-        Example 7:
-        Reddit Post:"Hi all!
-
-        The inspection report for the house I'm under contract for came back and over all it's not looking too bad.
-
-        Safety items found:
-        - outside next to the house dip in ground allows pooling of water next to foundation (grading issue)
-        - one outside outlet ground fault interruption didn't trigger 
-        - tree on front of house has rot in two hollows (otherwise healthy)
-        - railing spindles of deck stairs are nailed and not screwed in
-        - exposed insulation in the garage
-        - garage heater not working (seller disclosed this)
-        - exposed wires and outlet not installed in garage (basically outlet is hanging by one wire and a couple other wires are sticking out of the hole in the wall)
-        - most outlets in garage not working (inspector assumes that's because of the outlet hanging out of its usual space)
-        - handyman lights in the garage
-        - two fist size holes in the drywall in the garage of the wall shared with house
-        - no second railing on basement stairs (open to the basement/no wall on that side)
-        - bathroom door is not opening freely (scratching on floor)
-        - spindles of stair railing a can be removed by pushing up and pulling (call me crazy, but I think they are designed to do that?! This way it's easy to replace them, no?)
-        - exposed capped wires outside the garage door (wires are for lamp install, but the lamp is not installed)
-
-        Those were the safety items. 
-        The repair items are:
-        - door stops missing at all interior doors
-        - deadbolt of door leading to garage from interior not engaging properly
-        - no air gap for sump pump pipes outside
-        - third of crawl space is not covered (part full basement, part crawl, the crawl is divided in 2/3 concrete covered, 1/3 dirt (no cover))
-        - second sump pump doesn't seem to be operating
-        - support columns in basement at not bolted down
-        - washer/dryer do not work and need to most likely be replaced
-        - shed (size of 1 car garage) needs gutters to prevent rot on the bottom
-        - pressure of both showers is low.
-
-        Okay, so overall as you can see not really a bad inspection! 
-        I'm in Illinois where it is custom to have it written in the contract that the buyer will only request health/safety things to be fixed and if asking anything more than that the contract can be terminated by the seller. I guess that's for protection of bringing the price down through none sense of the inspection.
-
-        Either way, I will go over the things with my realtor and my lawyer as well, but the things I'm inclined to ask for:
-
-        - grade out the dip at the foundation
-        - replace outside outlet that didn't trigger the ground fault interruption
-        - fix outlets in the garage 
-        - plane the bathroom door
-
-        Now, the repair items I'd like fixed (this is where I need to talk to realtor and lawyer if I can/should request them or if I'm risking the seller to terminate):
-
-        - install bolts for support columns in basement
-        - align deadbolt of interior to garage door
-        - repair/give allowance for washer and dryer
-
-        Does my list seem reasonable? The washer and dryer are interesting, since they are in the contract as working items, so I would expect I can bring that up as items. Also, if they repair or give me an allowance is that their call or can I just ask for an allowance and they can counter with repair? 
-
-        Thanks all!
-
-        Edit to add: this house is a rebuild, old house (except garage) burned down and the owners rebuilt it. So the inside is basically all brand new, just foundation and garage was reused.
-        "
-        Space:Inspection Reports for Homes
-        Perspective:Home Buyers
-        Subreddit:FirstTimeHomeBuyer
-        Analysis:
-        {{
-        "space_match": true,
-        "perspective_match": true
-        }}
-
-        Now, please analyze the following Reddit post:
-
+        Your task is to analyze Reddit posts for relevance to a given space and perspective. 
+    
         Given the following information:
-        Reddit Post: {post}
+        
+        Reddit Document: {post}
+        Reddit Post Title: {title}
+        Is Original Post(This value indicates if this is the original post or a comment, true means this is the original post, otherwise it's a comment):{is_post}
         Space: {space}
         Perspective: {perspective}
         Subreddit: {subreddit}
-
-
-        Please analyze the Reddit post and determine:
+    
+    
+        Please analyze the Reddit document and determine:
         1. Is the post topic relevant to the given space? (true/false) 
-        - Only state true if the topic the user discusses inside the post is directly relevant to the space.
-        2. Is the author of the post from the exact perspective provided? (true/false)
-        - Only state true if the user --DIRECTLY OR INDIRECTLY-- states that they are OR was the given perspective. Do not infer based on knowledge expressed. Only state true if you can conclusively prove they are the given perspective.
-        4. Explain how the title relates to the space and perspective.
-
+        - Only state true if one of the topics the user discusses inside the post is directly relevant to the space
+        2. Is the author of the post from the perspective provided? (true/false)
+        -  State true if you can reasonably infer they are the  exact given perspective using a mixture of subreddit, title, and post is used to infer this.
+        - You may and should make reasonable inferences based on the subreddit
+        3. Provide reasoning for both the space match and perspective match decisions.
+    
         {format_instructions}
-
-        Analysis:
         """
-
-        # Create a PromptTemplate
-        prompt = PromptTemplate(
-            input_variables=[ "post", "space", "perspective", "subreddit"],
-            template=prompt_template,
-            partial_variables={"format_instructions": parser.get_format_instructions()}
+        examples = [
+            {
+                "human" : """
+                Reddit Document: "FWIW, there's an indian family next door and they do have a "home chef" come over and cook for them. I only found out since one time, they accidentally came to my door and I was extremely confused, but more so, they looked extremely lost. Partially, that they didn't really speak much english. They explained they were X families cook, so I called my neighbor and asked if they were awaiting their chef, to which they said yes. Later on, I hired them from time to time for some very specific indian food and that was sooooooooooooooo worth it."
+                Space: In Home/ Private Chefs
+                Perspective: Bay Area Resident
+                Subreddit: bayarea
+                Title: At home chef scam?
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post directly discusses a personal experience with an in-home chef, describing how the author's neighbors employ one and how the author later hired the same chef for specific meals. This is directly relevant to the space of In Home/Private Chefs.",
+                "space_match": true,
+                "perspective_match_reasoning": "The author's perspective as a Bay Area resident can be inferred from multiple factors: they are posting in the 'bayarea' subreddit, they describe interactions with neighbors in a way that suggests local residency, and they mention hiring a local chef. These contextual clues strongly indicate that the author is indeed a Bay Area resident.",
+                "perspective_match": true
+                }}
+                """
+            },
+            {
+                "human" : """
+                Reddit Document: "The James Webb Space Telescope images are mind-blowing! I never thought I'd see such detailed pictures of distant galaxies in my lifetime."
+                Space: Space Science
+                Perspective: Astronomer
+                Subreddit: space
+                Title: "JWST images are incredible!"
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post directly discusses the James Webb Space Telescope, which is a major tool in space science research.",
+                "space_match": true,
+                "perspective_match_reasoning": "While the user shows enthusiasm for space imagery, there's no indication that they are an astronomer.",
+                "perspective_match": false
+                }}
+                """
+            },
+            {
+                "human" : """
+                Reddit Document: "As a software engineer, I'm fascinated by the latest developments in quantum computing. The potential for revolutionizing cryptography is huge!"
+                Space: Space Science
+                Perspective: Software Engineer
+                Subreddit: programming
+                Title: "Quantum computing and its impact on cryptography"
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post discusses quantum computing and cryptography, which are not directly related to space science.",
+                "space_match": false,
+                "perspective_match_reasoning": "The author explicitly states that they are a software engineer.",
+                "perspective_match": true
+                }}
+                """
+            },
+            {
+                "human" : """
+                Reddit Document: "IMO as a manager you need to think staff first patients second so that your staff are able to put patients first"
+                Space: Nursing Homes in the UK
+                Perspective: Nursing Home Manager
+                Subreddit: NursingUK
+                Title: "Staff management priorities in healthcare"
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post discusses general healthcare management principles but doesn't specifically mention nursing homes or the UK context.",
+                "space_match": false,
+                "perspective_match_reasoning": "While the author speaks from a managerial perspective, they don't explicitly state they are a nursing home manager.",
+                "perspective_match": false
+                }}
+                """
+            },
+            {
+                "human" : """
+                Reddit Document: "From a managers point of view it's difficult. They were supposed to be additional, to 'free up' band 5s for 'more complex tasks' but this hasn't happened. I have to have 1 NA on the ward but that means I have to sacrifice an RN position. 
+            
+                So I've had to have one and put them on the rota but they have to run a bay, which means I or the charge nurse that day has to oversee them because technically NA are not supposed to actually 'plan care' just help deliver it, and they're not supposed to do IVs and other things (lots of trusts will be scaling back what they've allowed NA to do in the coming months as they've far surpassed what they were originally for). 
+            
+                They're fabulous at what they do but the restrictions to the role are causing problems because the role is being used in the wrong way. Before the role came out lots of us replied to the consultation saying they would be used instead of RN and replace them. We were told we were being silly. Well wel well."
+                Space: Nursing Homes in the UK
+                Perspective: Nursing Home Manager
+                Subreddit: NursingUK
+                Title: "Challenges with Nursing Associates in ward management"
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post discusses healthcare management in a UK context, mentioning wards and trusts, but doesn't specifically refer to nursing homes.",
+                "space_match": false,
+                "perspective_match_reasoning": "The author speaks from a managerial perspective in healthcare, but doesn't explicitly state they are a nursing home manager. They mention managing a ward, which is typically associated with hospitals rather than nursing homes.",
+                "perspective_match": false
+                }}
+                """
+            },
+            {
+                "human" : """
+                Reddit Document: "Hello,
+            
+                Thank you very much for the detailed response. I super appreciate the time you took to write it. 
+            
+                I should have clearly stated from the beginning for Buyers to order their own Inspections. 
+            
+                I'm in California too. We checked the box for Buyers to pay inspections to make their offer stronger, since there two other offers on the table. 
+            
+                I should have clarified with listing agent whether they had inspections available or not prior to writing offer. 
+            
+                If the listing agent ordered inspections during the listing period, and the reports happened to be available right after we were in contract, I should have just used those as additional inspections, and not Buyer's main inspections. Did I understand that right?"
+                Space: Real Estate Agents and Inspection Reports
+                Perspective: Home Buyer
+                Subreddit: realtors
+                Title: "Clarification on handling inspection reports in real estate transactions"
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post directly discusses real estate transactions and inspection reports, which is relevant to the given space.",
+                "space_match": true,
+                "perspective_match_reasoning": "The author seems to be speaking from the perspective of a real estate agent or professional, not a home buyer. They mention actions typically taken by agents, such as writing offers and communicating with listing agents.",
+                "perspective_match": false
+                }}
+                """
+            },
+            {
+                "human" : """
+                Reddit Document:"Hi all!
+                The inspection report for the house I'm under contract for came back and over all it's not looking too bad.
+            
+                Safety items found:
+                - outside next to the house dip in ground allows pooling of water next to foundation (grading issue)
+                - one outside outlet ground fault interruption didn't trigger 
+                - tree on front of house has rot in two hollows (otherwise healthy)
+                - railing spindles of deck stairs are nailed and not screwed in
+                - exposed insulation in the garage
+                - garage heater not working (seller disclosed this)
+                - exposed wires and outlet not installed in garage (basically outlet is hanging by one wire and a couple other wires are sticking out of the hole in the wall)
+                - most outlets in garage not working (inspector assumes that's because of the outlet hanging out of its usual space)
+                - handyman lights in the garage
+                - two fist size holes in the drywall in the garage of the wall shared with house
+                - no second railing on basement stairs (open to the basement/no wall on that side)
+                - bathroom door is not opening freely (scratching on floor)
+                - spindles of stair railing a can be removed by pushing up and pulling (call me crazy, but I think they are designed to do that?! This way it's easy to replace them, no?)
+                - exposed capped wires outside the garage door (wires are for lamp install, but the lamp is not installed)
+            
+                Those were the safety items. 
+                The repair items are:
+                - door stops missing at all interior doors
+                - deadbolt of door leading to garage from interior not engaging properly
+                - no air gap for sump pump pipes outside
+                - third of crawl space is not covered (part full basement, part crawl, the crawl is divided in 2/3 concrete covered, 1/3 dirt (no cover))
+                - second sump pump doesn't seem to be operating
+                - support columns in basement at not bolted down
+                - washer/dryer do not work and need to most likely be replaced
+                - shed (size of 1 car garage) needs gutters to prevent rot on the bottom
+                - pressure of both showers is low.
+            
+                Okay, so overall as you can see not really a bad inspection! 
+                I'm in Illinois where it is custom to have it written in the contract that the buyer will only request health/safety things to be fixed and if asking anything more than that the contract can be terminated by the seller. I guess that's for protection of bringing the price down through none sense of the inspection.
+            
+                Either way, I will go over the things with my realtor and my lawyer as well, but the things I'm inclined to ask for:
+            
+                - grade out the dip at the foundation
+                - replace outside outlet that didn't trigger the ground fault interruption
+                - fix outlets in the garage 
+                - plane the bathroom door
+            
+                Now, the repair items I'd like fixed (this is where I need to talk to realtor and lawyer if I can/should request them or if I'm risking the seller to terminate):
+            
+                - install bolts for support columns in basement
+                - align deadbolt of interior to garage door
+                - repair/give allowance for washer and dryer
+            
+                Does my list seem reasonable? The washer and dryer are interesting, since they are in the contract as working items, so I would expect I can bring that up as items. Also, if they repair or give me an allowance is that their call or can I just ask for an allowance and they can counter with repair? 
+            
+                Thanks all!
+            
+                Edit to add: this house is a rebuild, old house (except garage) burned down and the owners rebuilt it. So the inside is basically all brand new, just foundation and garage was reused.
+                "
+                Space: Inspection Reports for Homes
+                Perspective: Home Buyers
+                Subreddit: FirstTimeHomeBuyer
+                Title: "Feedback needed on my home inspection report and repair requests"
+                """,
+                "ai": """
+                {{
+                "space_match_reasoning": "The post directly discusses a home inspection report in detail, which is exactly relevant to the space of 'Inspection Reports for Homes'.",
+                "space_match": true,
+                "perspective_match_reasoning": "The author is clearly a home buyer, as they mention being 'under contract' for a house and discuss their intentions regarding repair requests based on the inspection report.",
+                "perspective_match": true
+                }}
+                """
+            },
+            {
+                "human" : """
+                Document: "One piece of business advice is to not outsource your core competency. If supply chain, customer service, accounting, etc. is not the source of your competitive advantage, then you should absolutely experiment with outsourcing. Good examples like you've mentioned are 3PL (fulfyd, ShipBob, ShipHero, etc.), customer service (MelodyArc, wrrk, SupportNinja), and accounting (Pilot, Brex, various smaller providers)."
+                Space: Bay Area Outsourcing
+                Perspective: Bay Area CEO Startup Founders/Employees
+                Title: Do you think it's reasonable for a start-up to outsource some functions?
+                Subreddit:Entrepreneur
+                """,
+                "ai": """
+                {{
+                  "space_match_reasoning": "While the document discusses outsourcing in general, it does not specifically mention or focus on Bay Area outsourcing. The examples and advice given are not region-specific and could apply to businesses anywhere. There's no mention of Bay Area-specific outsourcing trends, companies, or practices.",
+                  "space_match": false,
+                  "perspective_match_reasoning": "The document provides general business advice about outsourcing, but it doesn't indicate that it's written from the perspective of a Bay Area CEO or startup founder/employee. There are no references to Bay Area-specific experiences, challenges, or insights that would suggest this perspective. The advice seems to be from a general business standpoint rather than a localized Bay Area viewpoint.",
+                  "perspective_match": false
+                }}
+                """
+            },
+        ]
+        human_prompt = """
+        Reddit Document: {post}
+        Reddit Post Title: {title}
+        Is Original Post: {is_post}
+        Space: {space}
+        Perspective: {perspective}
+        Subreddit: {subreddit}
+        """
+        chat_messages = []
+        chat_messages.append(("system",prompt_template))
+     
+        for example in examples:
+            chat_messages.append(('human',example["human"]))
+            chat_messages.append(('ai',example["ai"]))
+        chat_messages.append(('human',human_prompt))
+        chat_template = ChatPromptTemplate(
+            chat_messages,
+            partial_variables={"format_instructions": parser.get_format_instructions()},
         )
 
         batch_inputs = []
-        for post,subreddit in zip(posts,subreddits):
+        for post,subreddit,title,is_post in zip(posts,subreddits,titles,is_posts):
             batch_inputs.append(
                 {
                     "post": post,
                     "space": self.space,
+                    "title": title,
+                    "is_post": is_post,
                     "perspective": self.perspective,
                     "subreddit": subreddit
                 }
             )
-        analyze_chain = prompt | self.openai_small_llm_json | parser
-        results = analyze_chain.batch(batch_inputs,config={"max_concurrency": 3,"callbacks": [BatchCallback(len(batch_inputs))]})
+        analyze_chain = chat_template | self.flash_gemini_llm | parser
+        results = analyze_chain.batch(batch_inputs,config={"max_concurrency": 10,"callbacks": [BatchCallback(len(batch_inputs))]})
     
         return results
     
@@ -649,8 +738,8 @@ class ReportManager:
                 "posts" : posts_str,
                 "format_instructions" : parser.get_format_instructions()
             })
-        
-        chain = chat_template | self.openai_small_llm_json | parser
+    
+        chain = chat_template | self.flash_gemini_llm | parser
         log.info("Starting Batch Pain Points")
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(queries))]})
@@ -671,9 +760,9 @@ class ReportManager:
         return pain_point_dict,  final_pain_point_embeddings
     
     def _cluster_pain_points(self,final_filtered_dict, final_pain_point_embeddings):
-        similarity_matrix = cosine_similarity(final_pain_point_embeddings)
 
         # Affinity Propagation clustering on similarity matrix
+        similarity_matrix = cosine_similarity(final_pain_point_embeddings)
         affinity_model = AffinityPropagation(affinity='euclidean', random_state=42)
         affprop = affinity_model.fit(similarity_matrix)
         labels = affprop.labels_
@@ -713,7 +802,7 @@ class ReportManager:
             distances_to_centers[label].append((distance, idx))
 
         # Filter out items with distance greater than the threshold
-        threshold = 0.2  # Adjust this value as needed (0.1 is equivalent to 0.9 similarity)
+        threshold = 0.15  # Adjust this value as needed (0.1 is equivalent to 0.9 similarity)
         filtered_distances_to_centers = {i: [] for i in range(len(distances_to_centers))}
         miscellaneous_cluster = []
 
@@ -741,8 +830,8 @@ class ReportManager:
         scaled_embeddings = scaler.fit_transform(final_persona_embeddings)
 
         # HDBSCAN clustering
-        cluster_size  = 2 if len(scaled_embeddings) < 100 else 5
-        min_samples = 1 if len(scaled_embeddings) < 100 else 3
+        cluster_size  = 2 if len(scaled_embeddings) < 500 else 5
+        min_samples = 1 if len(scaled_embeddings) < 500 else 3
         clusterer = hdbscan.HDBSCAN(metric='euclidean', min_cluster_size=cluster_size, min_samples=min_samples)
         labels = clusterer.fit_predict(scaled_embeddings)
 
@@ -933,7 +1022,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
             cluster_indices.append(cluster)
-        chain = chat_template | self.openai_big_llm | parser
+        chain = chat_template | self.openai_big_llm| parser
 
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency})
@@ -1320,7 +1409,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
 
-        chain = chat_template | self.openai_small_llm_json  | parser
+        chain = chat_template | self.flash_gemini_llm  | parser
 
         # Chain Invoke
         personas_response = chain.batch(queries,config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(queries))]})

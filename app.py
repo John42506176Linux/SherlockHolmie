@@ -21,7 +21,7 @@ from cdk_stacks.messy_ec2_stack import ReportEC2Stack
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 app = cdk.App()
 vpc = VpcStack(app,"SherlockVPC")

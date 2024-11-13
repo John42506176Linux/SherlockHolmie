@@ -12,7 +12,7 @@ import aws_cdk.aws_ecs_patterns as ecs_patterns
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Load environment variables
 db_username = os.getenv('DB_USERNAME')
@@ -28,6 +28,9 @@ aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 aws_rerank_model = os.getenv('AWS_RERANK_MODEL')
 aws_small_rerank_model = os.getenv('AWS_SMALL_RERANK_MODEL')
 nextjs_api_url = os.getenv('NEXTJS_API_URL')
+wcs_url = os.getenv('WCS_URL')
+wcs_api_key = os.getenv('WCS_API_KEY')
+aws_rerank_url = 'http://ec2-35-90-19-128.us-west-2.compute.amazonaws.com:7997/rerank'
 
 def get_latest_image_tag(repository_name):
     client = boto3.client('ecr', region_name='us-west-2')
@@ -74,51 +77,30 @@ class ReportClusterStack(core.Stack):
                 effect=iam.Effect.ALLOW
             )
         )
-        file_system = efs.FileSystem(self, "MyEfsFileSystem",
-            vpc=vpc.vpc,
-            lifecycle_policy=efs.LifecyclePolicy.AFTER_14_DAYS,
-            performance_mode=efs.PerformanceMode.GENERAL_PURPOSE,
-            security_group=ec2.SecurityGroup(self, "EfsSecurityGroup", vpc=vpc.vpc, allow_all_outbound=True)
-        )
-
-        # Create EFS Access Point
-        access_point = file_system.add_access_point("AccessPoint",
-            path="/app",  # Changed back to "/app" to match Docker Compose
-            create_acl=efs.Acl(
-                owner_uid="1000",
-                owner_gid="1000",
-                permissions="755"
-            ),
-            posix_user=efs.PosixUser(
-                uid="1000",
-                gid="1000"
-            ),
-        )
 
         # Get latest image tags
-        latest_report_image_tag = '3d87d19'  # Hardcoded for now
-        latest_celery_report_image_tag = '8a37941'
+        latest_report_image_tag = 'f6942f0'  # Hardcoded for now
 
         # Create security groups
         report_sg = ec2.SecurityGroup(self, "ReportSecurityGroup", vpc=vpc.vpc, allow_all_outbound=True)
         redis_sg = ec2.SecurityGroup(self, "RedisSecurityGroup", vpc=vpc.vpc, allow_all_outbound=True)
-        celery_sg = ec2.SecurityGroup(self, "CelerySecurityGroup", vpc=vpc.vpc, allow_all_outbound=True)
 
         # Allow inbound traffic from report to redis
         redis_sg.add_ingress_rule(report_sg, ec2.Port.tcp(6379), "Allow report service to access Redis")
         
         # Allow inbound traffic from celery to redis
-        redis_sg.add_ingress_rule(celery_sg, ec2.Port.tcp(6379), "Allow celery worker to access Redis")
-
+        print("AWS_RERANK_URL: ", aws_rerank_url)
 
         # Create Fargate Service and ALB for Report Service
         report_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self,
             "ReportService",
             cluster=self.cluster,
+            memory_limit_mib=2048,
             cpu=256,
-            memory_limit_mib=512,
-            desired_count=2,
+            min_healthy_percent=0,
+            desired_count=1,
+            health_check_grace_period=core.Duration.seconds(360),
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_registry(f'791346673593.dkr.ecr.us-west-2.amazonaws.com/sherlockholmie-report:{latest_report_image_tag}'),
                 environment={
@@ -136,6 +118,9 @@ class ReportClusterStack(core.Stack):
                     'AWS_RERANK_MODEL': aws_rerank_model,
                     'AWS_SMALL_RERANK_MODEL': aws_small_rerank_model,
                     'NEXTJS_API_URL': nextjs_api_url,
+                    'AWS_RERANK_URL': aws_rerank_url,
+                    'WCS_URL': wcs_url,
+                    'WCS_API_KEY': wcs_api_key,
                     'REDIS_URL': 'redis://redis.report.local:6379/0',
                 },
                 execution_role=task_role,
@@ -164,6 +149,7 @@ class ReportClusterStack(core.Stack):
             cluster=self.cluster,
             task_definition=redis_task_definition,
             desired_count=1,
+            min_healthy_percent=0,
             security_groups=[redis_sg],
             service_name="redis",
             cloud_map_options=ecs.CloudMapOptions(
@@ -171,125 +157,4 @@ class ReportClusterStack(core.Stack):
                 name="redis"
             )
         )
-
-        # Create a Fargate service for Celery Worker
-        celery_task_definition = ecs.FargateTaskDefinition(
-            self, "CeleryTaskDefinition",
-            memory_limit_mib=16384,
-            cpu=2048,
-            execution_role=task_role,
-        )
-
-        celery_container = celery_task_definition.add_container(
-            "CeleryContainer",
-            image=ecs.ContainerImage.from_registry(f'791346673593.dkr.ecr.us-west-2.amazonaws.com/sherlockholmie-celery:{latest_celery_report_image_tag}'),
-            logging=ecs.LogDrivers.aws_logs(stream_prefix="celery"),
-            environment={
-                'DB_HOST': db_host,
-                'DB_PORT': db_port,
-                'DB_DATABASE': db_database,
-                'DB_USERNAME': db_username,
-                'DB_PASSWORD': db_password,
-                'OPENAI_API_KEY': openai_api_key,
-                'ENV': 'PROD',
-                'AWS_REGION': 'us-west-2',
-                'AWS_ACCESS_KEY_ID': aws_access_key_id,
-                'AWS_SECRET_ACCESS_KEY': aws_secret_access_key,
-                'GOOGLE_API_KEY': google_api_key,
-                'AWS_RERANK_MODEL': aws_rerank_model,
-                'AWS_SMALL_RERANK_MODEL': aws_small_rerank_model,
-                'NEXTJS_API_URL': nextjs_api_url,
-                'REDIS_URL': 'redis://redis.report.local:6379/0',
-            },
-        )
-
-        celery_worker_service = ecs.FargateService(
-            self, "CeleryWorkerService",
-            cluster=self.cluster,
-            task_definition=celery_task_definition,
-            desired_count=1,
-            security_groups=[celery_sg],
-        )
-
-        # Add dependencies
-        celery_worker_service.node.add_dependency(redis_service)
-        report_service.service.node.add_dependency(redis_service)
-        report_task_definition = report_service.task_definition
-        report_task_definition.add_volume(
-            name="app-volume",
-            efs_volume_configuration=ecs.EfsVolumeConfiguration(
-                file_system_id=file_system.file_system_id,
-                transit_encryption="ENABLED",
-                authorization_config=ecs.AuthorizationConfig(
-                    access_point_id=access_point.access_point_id,
-                    iam="ENABLED"
-                ),
-                root_directory="/"
-            )
-        )
-
-        report_container = report_task_definition.find_container("web")
-        report_container.add_mount_points(
-            ecs.MountPoint(
-                container_path="/app",  # Changed back to "/app" to match Docker Compose
-                source_volume="app-volume",
-                read_only=False
-            )
-        )
-        celery_task_definition.add_volume(
-            name="app-volume",
-            efs_volume_configuration=ecs.EfsVolumeConfiguration(
-                file_system_id=file_system.file_system_id,
-                transit_encryption="ENABLED",
-                authorization_config=ecs.AuthorizationConfig(
-                    access_point_id=access_point.access_point_id,
-                    iam="ENABLED"
-                ),
-                root_directory="/"
-            )
-        )
-
-        celery_container.add_mount_points(
-            ecs.MountPoint(
-                container_path="/app",  # Changed back to "/app" to match Docker Compose
-                source_volume="app-volume",
-                read_only=False
-            )
-        )
-
-        # Update IAM permissions
-        task_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "elasticfilesystem:ClientMount",
-                    "elasticfilesystem:ClientWrite",
-                    "elasticfilesystem:DescribeMountTargets"
-                ],
-                resources=[file_system.file_system_arn]
-            )
-        )
-
-        # Allow connections to EFS from the services
-        file_system.connections.allow_default_port_from(celery_worker_service.connections)
-        file_system.connections.allow_default_port_from(report_service.service.connections)
-
-        # Grant access point permissions
-        efs.FileSystem.from_file_system_attributes(
-            self, "ImportedFileSystem",
-            file_system_id=file_system.file_system_id,
-            security_group=file_system.connections.security_groups[0]
-        ).grant_root_access(celery_worker_service.task_definition.task_role)
-        
-        efs.FileSystem.from_file_system_attributes(
-            self, "ImportedFileSystem2",
-            file_system_id=file_system.file_system_id,
-            security_group=file_system.connections.security_groups[0]
-        ).grant_root_access(report_service.task_definition.task_role)
-
-        efs_sg = ec2.SecurityGroup(self, "EFSSecurityGroup", vpc=vpc.vpc)
-        efs_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(2049), "Allow NFS traffic")
-
-        file_system.connections.allow_default_port_from(report_sg)
-        file_system.connections.allow_default_port_from(celery_sg)
-
                 

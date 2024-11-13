@@ -1,9 +1,6 @@
 progressbar2
 pyarrow
 requests
-pgvector
-SQLAlchemy
-psycopg2
 sshtunnel
 pandas
 tqdm
@@ -15,12 +12,11 @@ langchain-google-genai
 langchain-community
 python-dotenv==1.0.1
 fastapi==0.111.0
-llama-index==0.10.46
-llama-index-llms-bedrock
 hdbscan
 redis
 celery
 botocore
 keybert[spacy]
 keyphrase-vectorizers
-weaviate-client
+pyvespa==0.50.0
+vespacli

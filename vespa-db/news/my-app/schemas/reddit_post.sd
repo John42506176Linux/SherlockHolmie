@@ -1,0 +1,223 @@
+# Copyright Vespa.ai. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root.
+
+schema reddit_post {
+
+  document reddit_post {
+
+    field reddit_id type string {
+      indexing: attribute | summary
+      attribute: fast-search
+    }
+
+    field link_id type string {
+      indexing: attribute | summary
+      attribute: fast-search
+    }
+    
+    field subreddit_name type string {
+      indexing: attribute | summary | index
+      index: enable-bm25
+    }
+
+    field title type string {
+      indexing: index | summary
+      index: enable-bm25
+    }
+
+    field author type string {
+      indexing: index | summary
+      index: enable-bm25
+    }
+    field created_utc type long {
+      indexing: summary | attribute
+      attribute: fast-search
+    }
+
+    field url type string {
+      indexing: index | summary
+      index: enable-bm25
+    }
+
+    field body type string {
+      indexing: index | summary
+      index: enable-bm25
+    }
+
+    field score type int {
+      indexing: summary | attribute
+    }
+
+    field num_comments type int {
+      indexing: summary | attribute
+    }
+
+    field is_post type bool {
+      indexing: summary | attribute
+      attribute: fast-search
+    }
+
+    field parent_post type string {
+      indexing: index | summary
+      index: enable-bm25
+    }
+
+    field archived type bool {
+      indexing: summary | attribute
+      attribute: fast-search
+    }
+    
+    field keywords type array<string> {
+      indexing: index | summary
+      index: enable-bm25 # bm25 computed over all elements (bag of words)
+      bolding: on 
+    }
+  }
+
+  field mrl_bq_embedding type tensor<int8>(x[64]) {
+    indexing: input body | embed mxbai | attribute | index
+    attribute {
+        distance-metric: hamming
+    }
+  }
+  field body_embedding type tensor<bfloat16>(x[512]) {
+     indexing: input body | embed mxbai | attribute   
+     attribute {
+        paged
+        distance-metric: prenormalized-angular     
+     }
+  }
+
+  field keyword_mrl_bq_embeddings type tensor<int8>(p{},x[64]) {
+    indexing: input keywords | embed mxbai | attribute | index 
+    attribute {
+      distance-metric: hamming
+    }
+  }
+
+  field keyword_embeddings type tensor<bfloat16>(p{},x[512]) {
+    indexing: input keywords | embed mxbai | attribute
+    attribute {
+      distance-metric: prenormalized-angular
+      paged
+    }
+  }
+
+
+  field title_mrl_bq_embeddings type tensor<int8>(x[64]) {
+    indexing: input title | embed mxbai | attribute | index
+    attribute {
+      distance-metric: hamming
+    }
+  }
+
+  field title_embedding type tensor<bfloat16>(x[512]) {
+    indexing: input title | embed mxbai | attribute 
+    attribute {
+      distance-metric: prenormalized-angular
+      paged
+    }
+  }
+  
+
+  fieldset default {
+    fields: title, body, keywords
+  }
+
+
+  rank-profile bm25 {
+    first-phase {
+      expression: bm25(title) + bm25(body) + bm25(keywords) 
+    }
+  }
+
+   rank-profile semantic-rescoring {
+    inputs {
+      query(q) tensor<bfloat16>(x[512])
+      query(q_binary) tensor<int8>(x[64])
+    }
+    function bm25sum() {
+      expression: bm25(title) + bm25(body) + bm25(subreddit_name) + bm25(keywords)
+    }
+
+    function unpack_to_float() {
+      expression: 2*unpack_bits(attribute(mrl_bq_embedding), bfloat16)-1
+    }
+    first-phase {
+      expression: sum(query(q) * unpack_to_float) # inverted hamming 
+  
+    }
+    second-phase {
+      expression: closeness(field, body_embedding)
+      rerank-count: 1000
+    }
+    match-features: distance(field, mrl_bq_embedding) closeness(field, mrl_bq_embedding) firstPhase
+  }
+
+  rank-profile title-semantic-rescoring {
+    inputs {
+      query(q) tensor<bfloat16>(x[512])
+      query(q_binary) tensor<int8>(x[64])
+    }
+    function bm25sum() {
+      expression: bm25(title) + bm25(body) + bm25(subreddit_name) + bm25(keywords)
+    }
+
+    function unpack_to_float() {
+      expression: 2*unpack_bits(attribute(title_mrl_bq_embeddings), bfloat16)-1
+    }
+    first-phase {
+      expression: sum(query(q) * unpack_to_float) # inverted hamming 
+  
+    }
+    second-phase {
+      expression: closeness(field, title_embedding)
+      rerank-count: 1000
+    }
+    match-features: distance(field, title_mrl_bq_embeddings) closeness(field, title_mrl_bq_embeddings) firstPhase
+  }
+
+  rank-profile weighted_closeness_combination inherits semantic-rescoring {
+
+    function max_keyword_similarities() {
+      expression {
+        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
+      }
+    }
+      function closeness_body() {
+        expression: closeness(field,body_embedding)
+      }
+
+      function closeness_title() {
+        expression: cosine_similarity(query(q), attribute(title_embedding),x)
+      }
+
+      first-phase {
+        expression: closeness(field, mrl_bq_embedding)
+      }
+      second-phase {
+        # Weighted sum of closeness values with chosen weights
+        expression: 0.5 * closeness_body() + 0.3 * max_keyword_similarities + 0.2 * closeness_title()
+      }
+
+      match-features: closeness_body closeness_title distance(field, title_embedding) distance(field, keyword_embeddings)  max_keyword_similarities 
+  }
+
+
+  rank-profile hybrid-rescoring inherits semantic-rescoring {
+
+    first-phase {
+      expression: closeness(field, mrl_bq_embedding)
+    }
+    global-phase {
+      expression: reciprocal_rank_fusion(bm25sum, closeness(field, body_embedding))
+      rerank-count: 1000
+    }
+  }
+
+  
+
+  document-summary minimal {
+    summary reddit_id {}
+    summary title {}
+  }
+}

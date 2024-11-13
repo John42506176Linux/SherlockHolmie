@@ -226,7 +226,7 @@ class RedditPostAnalysis(BaseModel):
     space_match: bool = Field(description="Whether the post is relevant to the given space")
     perspective_match_reasoning:str = Field(description="Think step by step if this post's author is the given perspective .")
     perspective_match: bool = Field(description="Whether the user writing this post is the given perspective.")
-
+    
 class QueryList(BaseModel):
     query: List[str] = Field(description="List of alternate queries")
 

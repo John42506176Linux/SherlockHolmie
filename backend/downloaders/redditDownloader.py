@@ -6,6 +6,7 @@ import pyarrow.parquet as pq
 import os
 import glob
 import logging.handlers
+from datetime import datetime
 
 # List of User-Agent strings
 user_agents = [
@@ -21,11 +22,13 @@ log = logging.getLogger("bot")
 
 class RedditDownloader:
     def __init__(self,start_date, end_date, subreddit,output_folder,is_post):
-        log.info(f"Subreddit 2:{subreddit}")
+        log.info(f"Subreddit:{subreddit}")
         self.url = f"https://arctic-shift.photon-reddit.com/api/{'posts' if is_post else 'comments'}/search?sort=asc&subreddit={subreddit}"
         self.start_date = start_date.timestamp()
         self.end_date = end_date.timestamp()
         self.current_date = self.start_date
+        print("REDDIT DOWNLOADER DATES START AND END")
+        print(f"Start Date:{start_date.strftime('%Y-%m-%d %H:%M:%S')} End Date:{end_date.strftime('%Y-%m-%d %H:%M:%S')}")
         self.subreddit = subreddit
         self.is_done = False
         self.is_running = True
@@ -54,7 +57,10 @@ class RedditDownloader:
                 print("Restarting file")
                 parquet_file = pq.ParquetFile(self.parquet_file)
                 last_batch = parquet_file.read_row_group(parquet_file.num_row_groups - 1)
+                print("Last Bath Length:",len(last_batch))
                 last_timestamp = last_batch.column('created_utc').to_pandas().iloc[-1]
+                last_datetime = datetime.fromtimestamp(last_timestamp)
+                print("Last Timestamp:", last_datetime)
                 self.current_date = last_timestamp + 1  # Resume from the next second
         else:
             # If no existing files, create a new filename including the end date
@@ -141,5 +147,7 @@ class RedditDownloader:
 
 def download_subreddit_data(start_date, end_date, subreddit, output_folder, is_post):
     # Check if the subreddit exists in the database
+    print("Start Date Downloading")
+    print(f"Start Date:{start_date.strftime('%Y-%m-%d %H:%M:%S')} End Date:{end_date.strftime('%Y-%m-%d %H:%M:%S')}")
     downloader = RedditDownloader(start_date, end_date, subreddit, output_folder, is_post)
     downloader.download_data()

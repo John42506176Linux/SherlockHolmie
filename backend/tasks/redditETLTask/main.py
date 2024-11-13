@@ -10,11 +10,10 @@ from embedders.redditEmbedder import RedditEmbedder
 import logging.handlers
 from dotenv import load_dotenv
 from processors.redditProcessor import RedditDataProcessor
-from models.models import  RedditPost
-from managers.weaviateDBManager import WeaviateManager
+from managers.vespaManager import VespaManager
 from sqlalchemy import func
 import pytz
-
+import asyncio
 # TODO: Set up full logging
 log = logging.getLogger("bot")
 log.setLevel(logging.DEBUG)
@@ -22,7 +21,7 @@ log.addHandler(logging.StreamHandler())
 
 load_dotenv(override=True)
 
-def full_reddit_download(db_manager: WeaviateManager):
+def full_reddit_download(db_manager: VespaManager):
     subreddit = os.getenv('SUBREDDIT')
     update = os.getenv('UPDATE', 'true').lower() == 'true'
     if update:
@@ -41,7 +40,7 @@ def full_reddit_download(db_manager: WeaviateManager):
         start_date = end_date - timedelta(days=int(os.getenv('YEARS', 2)) * 365)
         earliest_post_timestamp =db_manager.get_earliest_subreddit_time(subreddit)
         if earliest_post_timestamp is not None:
-            start_date = min(earliest_post_timestamp, datetime.now() - timedelta(days=int(os.getenv('YEARS', 2)) * 365))
+            start_date = min(earliest_post_timestamp, end_date - timedelta(days=int(os.getenv('YEARS', 2)) * 365))
             end_date = earliest_post_timestamp - timedelta(seconds=1)  # Start downloading from the timestamp of the latest post
         log.info(f"Start Date:{start_date.strftime('%Y-%m-%d %H:%M:%S')} End Date:{end_date.strftime('%Y-%m-%d %H:%M:%S')}")
     log.info("Start Downloading")
@@ -62,22 +61,22 @@ def full_reddit_download(db_manager: WeaviateManager):
             if future.exception():
                 print(f"Error encountered: {future.exception()}")
 
-def main():
-    wv_manager = WeaviateManager()
+async def main():
+    vespa_manager = VespaManager()
     try:
         log.info('Inserting Subreddit info into DB')
         log.info(f"Subreddit:{os.getenv('SUBREDDIT')}")
         log.info("Starting reddit download")
-        full_reddit_download(wv_manager)
+        full_reddit_download(vespa_manager)
         log.info("Finishing Subreddit info download")
         processor = RedditDataProcessor()
         processor.process_data()
         log.info('Finished Filtering Data')
-        embedder = RedditEmbedder(wv_manager=wv_manager)
-        embedder.bulk_embed_posts()
+        embedder = RedditEmbedder(vespa_manager=vespa_manager)
+        await embedder.bulk_embed_posts()
     except Exception as e:
         log.error(f'ERROR downloading reddit data:{e}')
-    wv_manager.close()
+    vespa_manager.close()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
