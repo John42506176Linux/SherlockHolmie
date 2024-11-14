@@ -191,10 +191,7 @@ schema reddit_post {
         expression: cosine_similarity(query(q), attribute(title_embedding),x)
       }
 
-      first-phase {
-        expression: closeness(field, mrl_bq_embedding)
-      }
-      second-phase {
+      first-phase  {
         # Weighted sum of closeness values with chosen weights
         expression: 0.5 * closeness_body() + 0.3 * max_keyword_similarities + 0.2 * closeness_title()
       }
