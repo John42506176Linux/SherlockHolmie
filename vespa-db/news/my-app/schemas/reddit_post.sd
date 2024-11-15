@@ -180,7 +180,7 @@ schema reddit_post {
 
     function max_keyword_similarities() {
       expression {
-        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), avg, p)
+        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
       }
     }
       function closeness_body() {
