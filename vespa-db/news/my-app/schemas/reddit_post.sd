@@ -180,7 +180,7 @@ schema reddit_post {
 
     function max_keyword_similarities() {
       expression {
-        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
+        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), avg, p)
       }
     }
       function closeness_body() {
@@ -199,7 +199,7 @@ schema reddit_post {
         expression: 0.5 * closeness_body() + 0.3 * max_keyword_similarities + 0.2 * closeness_title()
       }
 
-      match-features: closeness_body closeness_title distance(field, title_embedding) distance(field, keyword_embeddings)  max_keyword_similarities secondPhase firstPhase
+      match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase
   }
 
 
