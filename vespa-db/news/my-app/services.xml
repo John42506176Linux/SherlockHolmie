@@ -18,7 +18,7 @@
             <tokenizer-model url="https://huggingface.co/answerdotai/answerai-colbert-small-v1/resolve/main/tokenizer.json"/>
         </component>
         <component id = "tokenizer" type="hugging-face-tokenizer">
-            <tokenizer-model url="https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1/raw/main/tokenizer.json"/>
+            <model url="https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1/raw/main/tokenizer.json"/>
         </component>
         <document-api/>
         <search/>
