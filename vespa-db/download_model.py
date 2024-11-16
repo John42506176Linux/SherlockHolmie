@@ -38,4 +38,4 @@ def download_tokenizer(model_name: str = "mixedbread-ai/mxbai-rerank-large-v1") 
         print(f"Error downloading tokenizer: {e}")
 
 if __name__ == "__main__":
-    download_tokenizer()
+    download_model()
