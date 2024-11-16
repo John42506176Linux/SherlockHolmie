@@ -123,6 +123,7 @@ schema reddit_post {
       input input_ids: input_ids
       input attention_mask: attention_mask
       gpu-device: 0
+      output logits: logits
   }
   
 
