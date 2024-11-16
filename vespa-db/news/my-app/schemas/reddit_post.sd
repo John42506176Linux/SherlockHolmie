@@ -120,9 +120,8 @@ schema reddit_post {
 
   onnx-model cross_encoder {
       file: models/model_quantized.onnx
-      input input_ids: my_input_ids
-      input attention_mask: my_attention_mask
-      input token_type_ids: my_token_type_ids
+      input input_ids: input_ids
+      input attention_mask: attention_mask
       gpu-device: 0
   }
   
