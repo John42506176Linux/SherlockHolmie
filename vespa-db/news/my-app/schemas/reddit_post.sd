@@ -117,6 +117,14 @@ schema reddit_post {
       paged
     }
   }
+
+  onnx-model cross_encoder {
+      file: models/model.onnx
+      input input_ids: my_input_ids
+      input attention_mask: my_attention_mask
+      input token_type_ids: my_token_type_ids
+      gpu-device: 0
+  }
   
 
   fieldset default {
@@ -183,6 +191,18 @@ schema reddit_post {
         reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
       }
     }
+
+    function input_ids() {
+            expression {
+                customTokenInputIds(1, 2, 512, query(q), attribute(body_tokens))
+            }
+        }
+
+        function attention_mask() {
+            expression {
+                tokenAttentionMask(512, query(q), attribute(body_tokens))
+            }
+        }
       function closeness_body() {
         expression: closeness(field,body_embedding)
       }
@@ -190,16 +210,31 @@ schema reddit_post {
       function closeness_title() {
         expression: cosine_similarity(query(q), attribute(title_embedding),x)
       }
+
       first-phase {
-        expression: closeness(field, mrl_bq_embedding)
+        expression: bm25sum()
       }
 
       second-phase  {
         # Weighted sum of closeness values with chosen weights
+        rerank-count: 5000
         expression: 0.5 * closeness_body() + 0.3 * max_keyword_similarities + 0.2 * closeness_title()
       }
 
+      global-phase {
+            rerank-count: 100
+            expression {
+                sigmoid(onnx(crossencoder).logits{d0:0,d1:0})
+            }
+        }
+
       match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase
+      summary-features {
+        query(q)
+        input_ids
+        attention_mask
+        onnx(crossencoder).logits
+      }
   }
 
 
