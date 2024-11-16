@@ -118,7 +118,7 @@ schema reddit_post {
     }
   }
 
-  onnx-model cross_encoder {
+  onnx-model crossencoder {
       file: models/model_quantized.onnx
       input input_ids: input_ids
       input attention_mask: attention_mask
