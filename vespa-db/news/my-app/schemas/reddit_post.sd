@@ -118,7 +118,7 @@ schema reddit_post {
     }
   }
 
-  onnx-model crossencoder {
+  onnx-model cross_encoder {
       file: models/model_quantized.onnx
       input input_ids: input_ids
       input attention_mask: attention_mask
@@ -224,7 +224,7 @@ schema reddit_post {
       global-phase {
             rerank-count: 100
             expression {
-                sigmoid(onnx(crossencoder).logits{d0:0,d1:0})
+                sigmoid(onnx(cross_encoder).logits{d0:0,d1:0})
             }
         }
 
@@ -233,7 +233,7 @@ schema reddit_post {
         query(q)
         input_ids
         attention_mask
-        onnx(crossencoder).logits
+        onnx(cross_encoder).logits
       }
   }
 
