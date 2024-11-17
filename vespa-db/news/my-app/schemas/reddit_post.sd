@@ -217,7 +217,7 @@ schema reddit_post {
       }
 
       first-phase {
-        expression: bm25sum()
+        expression: bm25(title) + bm25(body) + bm25(keywords) + bm25(subreddit_name)
       }
 
       second-phase  {
