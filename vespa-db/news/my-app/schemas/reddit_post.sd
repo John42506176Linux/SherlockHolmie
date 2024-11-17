@@ -234,12 +234,6 @@ schema reddit_post {
         }
 
       match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase
-      summary-features {
-            query(q_rerank)
-            input_ids
-            attention_mask
-            onnx(cross_encoder).logits
-        }
   }
 
 
