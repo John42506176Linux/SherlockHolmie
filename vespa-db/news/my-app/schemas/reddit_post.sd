@@ -118,7 +118,7 @@ schema reddit_post {
     }
   }
   field body_tokens type tensor<float>(d0[512]) {
-      indexing: input body | embed tokenizer | attribute | summary
+      indexing: input body | embed tokenizer | attribute 
   }
 
   onnx-model cross_encoder {
