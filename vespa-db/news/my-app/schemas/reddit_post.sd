@@ -117,6 +117,9 @@ schema reddit_post {
       paged
     }
   }
+  field body_tokens type tensor<float>(d0[512]) {
+      indexing: input text | embed tokenizer | attribute | summary
+  }
 
   onnx-model cross_encoder {
       file: models/model_quantized.onnx
