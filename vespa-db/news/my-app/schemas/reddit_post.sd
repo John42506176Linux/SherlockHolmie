@@ -238,7 +238,7 @@ schema reddit_post {
             query(q_rerank)
             input_ids
             attention_mask
-            onnx(crossencoder).logits
+            onnx(cross_encoder).logits
         }
   }
 
