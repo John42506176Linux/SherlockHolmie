@@ -1,7 +1,7 @@
 from pathlib import Path
 import requests
 
-def download_model(model_name: str = "mixedbread-ai/mxbai-rerank-large-v1") -> None:
+def download_model(model_name: str = "mixedbread-ai/mxbai-rerank-xsmall-v1") -> None:
     """Download the ONNX model from HuggingFace."""
     url = f"https://huggingface.co/{model_name}/resolve/main/onnx/model_quantized.onnx"
     local_model_path = "models/model_quantized.onnx"
@@ -17,7 +17,7 @@ def download_model(model_name: str = "mixedbread-ai/mxbai-rerank-large-v1") -> N
     except Exception as e:
         print(f"Error downloading model: {e}")
 
-def download_tokenizer(model_name: str = "mixedbread-ai/mxbai-rerank-large-v1") -> None:
+def download_tokenizer(model_name: str = "mixedbread-ai/mxbai-rerank-xsmall-v1") -> None:
     """Download the tokenizer files from HuggingFace."""
     base_url = f"https://huggingface.co/{model_name}/resolve/main"
     files = ["tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"]
