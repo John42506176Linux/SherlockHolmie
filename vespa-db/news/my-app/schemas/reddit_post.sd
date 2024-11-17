@@ -188,7 +188,9 @@ schema reddit_post {
   }
 
   rank-profile weighted_closeness_combination inherits semantic-rescoring {
-
+    inputs {
+        query(q_rerank) tensor<float>(d0[64])
+    }
     function max_keyword_similarities() {
       expression {
         reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
@@ -197,13 +199,13 @@ schema reddit_post {
 
     function input_ids() {
             expression {
-                customTokenInputIds(1, 2, 512, query(q), attribute(body_tokens))
+                customTokenInputIds(1, 2, 512, query(q_rerank), attribute(body_tokens))
             }
         }
 
         function attention_mask() {
             expression {
-                tokenAttentionMask(512, query(q), attribute(body_tokens))
+                tokenAttentionMask(512, query(q_rerank), attribute(body_tokens))
             }
         }
       function closeness_body() {
@@ -232,6 +234,12 @@ schema reddit_post {
         }
 
       match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase
+      summary-features {
+            query(q_rerank)
+            input_ids
+            attention_mask
+            onnx(crossencoder).logits
+        }
   }
 
 
