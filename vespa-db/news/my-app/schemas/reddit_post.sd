@@ -196,6 +196,9 @@ schema reddit_post {
         reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
       }
     }
+    function scale(val) {
+        expression: 2*atan(val/8)/(3.14159)
+    }
 
     function input_ids() {
             expression {
@@ -223,7 +226,7 @@ schema reddit_post {
       second-phase  {
         # Weighted sum of closeness values with chosen weights
         rerank-count: 5000
-        expression: (0.5 * (normalize_linear(closeness_body()) + normalize_linear(bm25(body)))) + 0.3 * (normalize_linear(bm25(keywords)) + normalize_linear(max_keyword_similarities)) + 0.2 * (normalize_linear(bm25(title)) + normalize_linear(closeness_title()))
+        expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
       }
 
       global-phase {
