@@ -212,7 +212,7 @@ schema reddit_post {
             }
         }
       function closeness_body() {
-        expression: normalizecloseness(field,body_embedding)
+        expression: closeness(field,body_embedding)
       }
 
       function closeness_title() {
