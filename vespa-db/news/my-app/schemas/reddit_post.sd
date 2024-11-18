@@ -246,20 +246,11 @@ schema reddit_post {
       match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase
   }
 
-  rank-profile weighted_closeness_combination_colbert inherits semantic-rescoring {
-     inputs {
-            query(qt) tensor<float>(querytoken{}, v[96])
+  rank-profile colbert-max-sim-context-level inherits bm25 {
+        inputs {
+            query(qt) tensor<float>(querytoken{}, v[128])
         }
-    function max_keyword_similarities() {
-      expression {
-        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
-      }
-    }
-    function scale(val) {
-        expression: 2*atan(val/8)/(3.14159)
-    }
-
-    function max_sim_per_context() {
+         function max_sim_per_context() {
             expression {
                 sum(
                     reduce(
@@ -270,28 +261,10 @@ schema reddit_post {
                 )
             }
         }
-      function closeness_body() {
-        expression: closeness(field,body_embedding)
-      }
-
-      function closeness_title() {
-        expression: cosine_similarity(query(q), attribute(title_embedding),x)
-      }
-
-      first-phase {
-        expression: bm25(title) + bm25(body) + bm25(keywords) + bm25(subreddit_name)
-      }
-
-
-
-      second-phase {
-            rerank-count: 100
+        second-phase {
             expression { reduce(max_sim_per_context, max, context) }
         }
-
-
-      match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase 
-  }
+}
 
 
   rank-profile hybrid-rescoring inherits semantic-rescoring {
