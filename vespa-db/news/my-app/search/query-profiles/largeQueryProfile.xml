@@ -1,6 +1,6 @@
 <query-profile id="largeQueryProfile">
     <field name="ranking">weighted_closeneness_combination</field>
-    <field name="timeout">1000</field>
+    <field name="timeout">1000s</field>
     <field name="query">""</field>
     <field name="maxHits">10000</field>
     <field name="summary">minimal</field>
