@@ -73,7 +73,12 @@ def semantic_query(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 "input.query(q_rerank)": "embed(tokenizer,@query)"
             },
         )
-        return response.hits
+        reddit_documents = []
+        for hit in response.hits:
+            fields = hit['fields']
+            filtered_fields = {k: v for k, v in fields.items() if k not in ['documentid', 'sddocname', 'matchfeatures']}
+            reddit_documents.append(filtered_fields)
+        return reddit_documents
 
 if __name__ == "__main__":
     # Example usage
@@ -84,4 +89,6 @@ if __name__ == "__main__":
           get_latest_posts(test_subreddit))
     
     semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=100)
-    print(f"\nSemantic query result:", semantic_query_result)
+    print(f"\nSemantic query result:")
+    for i, doc in enumerate(semantic_query_result, start=1):
+        print(f"Post {i}. {doc}")

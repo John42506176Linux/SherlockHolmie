@@ -119,13 +119,9 @@ schema reddit_post {
   }
   field body_tokens type tensor<float>(d0[512]) {
       indexing: input body | embed tokenizer | attribute 
-  }
-
-  field colbert type tensor<int8>(context{}, token{}, x[12]) {
-    indexing: input body | embed colbert context | attribute
-    attribute {
-      paged
-    }
+      attribute {
+          distance-metric: euclidean
+      }
   }
 
   onnx-model cross_encoder {
@@ -243,28 +239,9 @@ schema reddit_post {
             }
         }
 
-      match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase
+      match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase bm25(title) bm25(body) bm25(keywords) bm25(subreddit_name)
   }
 
-  rank-profile colbert-max-sim-context-level inherits bm25 {
-        inputs {
-            query(qt) tensor<float>(querytoken{}, v[128])
-        }
-         function max_sim_per_context() {
-            expression {
-                sum(
-                    reduce(
-                        sum(query(qt) * unpack_bits(attribute(colbert)) , v),
-                        max, token
-                    ),
-                    querytoken
-                )
-            }
-        }
-        second-phase {
-            expression { reduce(max_sim_per_context, max, context) }
-        }
-}
 
 
   rank-profile hybrid-rescoring inherits semantic-rescoring {
