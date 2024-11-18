@@ -260,16 +260,16 @@ schema reddit_post {
     }
 
     function max_sim() {
-            expression {
-                sum(
-                    reduce(
-                        sum(query(qt) * unpack_bits(attribute(colbert)) , v),
-                        max, token
-                    ),
-                    querytoken
-                )
-            }
+        expression {
+            sum(
+                reduce(
+                    sum(query(qt) * unpack_bits(attribute(colbert)) , v),
+                    max, token
+                ),
+                querytoken
+            )
         }
+    }
       function closeness_body() {
         expression: closeness(field,body_embedding)
       }
@@ -290,7 +290,7 @@ schema reddit_post {
 
       global-phase {
             rerank-count: 100
-            expression max_sim()
+            expression: max_sim()
         }
 
 
