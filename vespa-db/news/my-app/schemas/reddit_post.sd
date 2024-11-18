@@ -264,7 +264,7 @@ schema reddit_post {
             sum(
                 reduce(
                     sum(query(qt) * unpack_bits(attribute(colbert)) , v),
-                    max, token
+                    max, token, context
                 ),
                 querytoken
             )
@@ -290,7 +290,7 @@ schema reddit_post {
 
       global-phase {
             rerank-count: 100
-            expression: max_sim()
+            expression: reduce(max_sim, max, context)
         }
 
 
