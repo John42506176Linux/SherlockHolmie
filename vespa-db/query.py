@@ -91,4 +91,6 @@ if __name__ == "__main__":
     semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=100)
     print(f"\nSemantic query result:")
     for i, doc in enumerate(semantic_query_result, start=1):
-        print(f"Post {i}. {doc}")
+        print(f"Post {i}:")
+        for field, value in doc.items():
+            print(f"  {field}: {value}")

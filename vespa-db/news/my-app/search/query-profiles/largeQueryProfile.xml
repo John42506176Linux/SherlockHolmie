@@ -3,9 +3,5 @@
     <field name="timeout">1000</field>
     <field name="query">""</field>
     <field name="maxHits">10000</field>
-    <field name="unique">merchantid</field>
     <field name="summary">minimal</field>
-    <field name="input.query(q)">embed(mxbai,@query)</field>
-    <field name="input.query(q_binary)">embed(mxbai,@query)</field>
-    <field name="input.query(q_rerank)">embed(tokenizer,@query)</field>
 </query-profile>
