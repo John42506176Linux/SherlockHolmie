@@ -121,8 +121,8 @@ schema reddit_post {
       indexing: input body | embed tokenizer | attribute 
   }
 
-  field colbert type tensor<int8>(dt{}, x[12]) {
-    indexing: input body | embed colbert | attribute
+  field colbert type tensor<int8>(context{}, token{}, x[12]) {
+    indexing: input body | embed colbert context | attribute
     attribute {
       paged
     }
@@ -259,17 +259,17 @@ schema reddit_post {
         expression: 2*atan(val/8)/(3.14159)
     }
 
-    function max_sim() {
-        expression {
-            sum(
-                reduce(
-                    sum(query(qt) * unpack_bits(attribute(colbert)) , v),
-                    max, token, context
-                ),
-                querytoken
-            )
+    function max_sim_per_context() {
+            expression {
+                sum(
+                    reduce(
+                        sum(query(qt) * unpack_bits(attribute(colbert)) , v),
+                        max, token
+                    ),
+                    querytoken
+                )
+            }
         }
-    }
       function closeness_body() {
         expression: closeness(field,body_embedding)
       }
@@ -290,7 +290,7 @@ schema reddit_post {
 
       global-phase {
             rerank-count: 100
-            expression: max_sim()
+            expression { reduce(max_sim_per_context, max, context) }
         }
 
 
