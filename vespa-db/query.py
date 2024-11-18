@@ -66,6 +66,7 @@ def semantic_query(query: str, limit: int = 10) -> List[Dict[str, Any]]:
             body={
                 "yql": "select * from reddit_post where (userQuery()) or ({targetHits:5000}nearestNeighbor(body_embedding,q)) or ({targetHits:5000}nearestNeighbor(mrl_bq_embedding,q_binary)) or ({targetHits:5000}nearestNeighbor(title_embedding,q)) or ({targetHits:5000}nearestNeighbor(keyword_embeddings,q))",
                 "query": query,
+                "queryProfile": 'largeQueryProfile',
                 "ranking": "weighted_closeness_combination",
                 "timeout": "1000s",
                 "input.query(q)": "embed(mxbai,@query)",
@@ -88,7 +89,7 @@ if __name__ == "__main__":
     print(f"\nLatest posts from {test_subreddit}:", 
           get_latest_posts(test_subreddit))
     
-    semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=100)
+    semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=5000)
     print(f"\nSemantic query result:")
     for i, doc in enumerate(semantic_query_result, start=1):
         print(f"Post {i}:")

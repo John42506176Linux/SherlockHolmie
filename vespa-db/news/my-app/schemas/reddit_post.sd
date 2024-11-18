@@ -190,7 +190,7 @@ schema reddit_post {
     match-features: distance(field, title_mrl_bq_embeddings) closeness(field, title_mrl_bq_embeddings) firstPhase
   }
 
-  rank-profile weighted_closeness_combination inherits semantic-rescoring {
+  rank-profile weighted_closeness_combination_rerank inherits semantic-rescoring {
     inputs {
         query(q_rerank) tensor<float>(d0[64])
     }
@@ -238,6 +238,37 @@ schema reddit_post {
                 sigmoid(onnx(cross_encoder).logits{d0:0,d1:0})
             }
         }
+
+      match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase bm25(title) bm25(body) bm25(keywords) bm25(subreddit_name)
+  }
+
+  rank-profile weighted_closeness_combination inherits semantic-rescoring {
+    function max_keyword_similarities() {
+      expression {
+        reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
+      }
+    }
+    function scale(val) {
+        expression: 2*atan(val/8)/(3.14159)
+    }
+
+      function closeness_body() {
+        expression: closeness(field,body_embedding)
+      }
+
+      function closeness_title() {
+        expression: cosine_similarity(query(q), attribute(title_embedding),x)
+      }
+
+      first-phase {
+        expression: bm25(title) + bm25(body) + bm25(keywords) + bm25(subreddit_name)
+      }
+
+      second-phase  {
+        # Weighted sum of closeness values with chosen weights
+        rerank-count: 5000
+        expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
+      }
 
       match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase bm25(title) bm25(body) bm25(keywords) bm25(subreddit_name)
   }
