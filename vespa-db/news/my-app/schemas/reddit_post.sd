@@ -125,7 +125,7 @@ schema reddit_post {
   }
 
   field colbert type tensor<int8>(context{}, token{}, v[12]) {
-    indexing: input text | embed colbert context | attribute
+    indexing: input body | embed colbert context | attribute
     attribute: paged
   }
 
