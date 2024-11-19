@@ -176,19 +176,25 @@ schema reddit_post {
           inputs {
               query(qt) tensor<float>(dt{}, v[96])
           }
-          function max_sim_per_context() {
+
+          function unpack() {
+              expression: unpack_bits(attribute(colbert))
+          }
+           function max_sim() {
               expression {
                   sum(
                       reduce(
-                          sum(query(qt) * unpack_bits(attribute(colbert)) , v),
-                          max, token
+                          sum(
+                              query(qt) * unpack() , x
+                          ),
+                          max, dt
                       ),
-                      querytoken
+                      qt
                   )
               }
           }
           second-phase {
-              expression { reduce(max_sim_per_context, max, context) }
+            expression: max_sim
           }
   }
 
