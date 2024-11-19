@@ -124,8 +124,8 @@ schema reddit_post {
       }
   }
 
-  field colbert type tensor<int8>(context{}, token{}, v[12]) {
-    indexing: input body | embed colbert context | attribute
+  field colbert type tensor<int8>(dt{} v[12]) {
+    indexing: input body | embed colbert | attribute
     attribute: paged
   }
 
@@ -174,7 +174,7 @@ schema reddit_post {
 
   rank-profile colbert-max-sim-context-level inherits bm25 {
           inputs {
-              query(qt) tensor<float>(querytoken{}, v[96])
+              query(qt) tensor<float>(dt{}, v[96])
           }
           function max_sim_per_context() {
               expression {

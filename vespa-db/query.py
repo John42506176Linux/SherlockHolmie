@@ -71,13 +71,13 @@ def semantic_query(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 "timeout": "1000s",
                 "input.query(q)": "embed(mxbai,@query)",
                 "input.query(q_binary)": "embed(mxbai,@query)",
-                "input.query(q_rerank)": "embed(tokenizer,@query)"
             },
         )
         reddit_documents = []
         for hit in response.hits:
             fields = hit['fields']
             filtered_fields = {k: v for k, v in fields.items() if k not in ['documentid', 'sddocname', 'matchfeatures']}
+            filtered_fields['relevance'] = hit['relevance']
             reddit_documents.append(filtered_fields)
         return reddit_documents
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     print(f"\nLatest posts from {test_subreddit}:", 
           get_latest_posts(test_subreddit))
     
-    semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=5000)
+    semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=100)
     print(f"\nSemantic query result:")
     for i, doc in enumerate(semantic_query_result, start=1):
         print(f"Post {i}:")
