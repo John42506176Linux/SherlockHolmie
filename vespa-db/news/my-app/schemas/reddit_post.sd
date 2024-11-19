@@ -124,6 +124,11 @@ schema reddit_post {
       }
   }
 
+  field colbert type tensor<int8>(context{}, token{}, v[12]) {
+    indexing: input text | embed colbert context | attribute
+    attribute: paged
+  }
+
   onnx-model cross_encoder {
       file: models/model_quantized.onnx
       input input_ids: input_ids
@@ -165,6 +170,26 @@ schema reddit_post {
       rerank-count: 1000
     }
     match-features: distance(field, mrl_bq_embedding) closeness(field, mrl_bq_embedding) firstPhase
+  }
+
+  rank-profile colbert-max-sim-context-level inherits bm25 {
+          inputs {
+              query(qt) tensor<float>(querytoken{}, v[96])
+          }
+          function max_sim_per_context() {
+              expression {
+                  sum(
+                      reduce(
+                          sum(query(qt) * unpack_bits(attribute(colbert)) , v),
+                          max, token
+                      ),
+                      querytoken
+                  )
+              }
+          }
+          second-phase {
+              expression { reduce(max_sim_per_context, max, context) }
+          }
   }
 
   rank-profile title-semantic-rescoring {
