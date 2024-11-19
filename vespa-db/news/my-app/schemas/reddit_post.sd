@@ -124,7 +124,7 @@ schema reddit_post {
       }
   }
 
-  field colbert type tensor<int8>(dt{} v[12]) {
+  field colbert type tensor<int8>(dt{}, v[12]) {
     indexing: input body | embed colbert | attribute
     attribute: paged
   }
