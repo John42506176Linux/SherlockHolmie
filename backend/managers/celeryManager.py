@@ -1,8 +1,7 @@
 from celery import Celery
 import logging
 import time
-from managers.databaseManager import DatabaseManager
-from managers.weaviateDBManager import WeaviateManager
+from managers.vespaManager import VespaManager
 
 from managers.reportManager import ReportManager
 import os 
@@ -20,9 +19,9 @@ log = logging.getLogger("bot")
 
 @app.task
 def process_space_task(params):
-    wv_manager = WeaviateManager()
+    vespa_manager = VespaManager()
     start_time = time.time()
-    report_manager = ReportManager(wv_manager)
+    report_manager = ReportManager(vespa_manager)
     log.info("Database Manager created")
     try:
         log.info(f"Initializing Space: {params['space']}")
@@ -61,4 +60,4 @@ def process_space_task(params):
         log.error(f"Error processing space: {e}")
         return {"error": str(e)}
     finally:
-        wv_manager.close()
+        vespa_manager.close()

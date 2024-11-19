@@ -18,7 +18,7 @@ services:
       dockerfile: ./tasks/reportTask/Dockerfile
     image: report-task
     ports:
-      - "5000:80"  # Map host's port 5001 to container's port 80
+      - "5001:80"  # Map host's port 5001 to container's port 80
     env_file:
       - ./.env
     volumes:

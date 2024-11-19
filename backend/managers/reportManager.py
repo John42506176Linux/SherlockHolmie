@@ -1,4 +1,4 @@
-from managers.weaviateDBManager import WeaviateManager
+from managers.vespaManager import VespaManager
 from langchain.docstore.document import Document
 from langchain_google_genai import (
     ChatGoogleGenerativeAI,
@@ -61,8 +61,8 @@ class BatchCallback(BaseCallbackHandler):
 
 # TODO: Handle no pain points   
 class ReportManager:
-    def __init__(self,wv_manager: WeaviateManager):
-        self.wv_manager = wv_manager
+    def __init__(self,vespa_manager: VespaManager):
+        self.vespa_manager = vespa_manager
         self.report_type = "Space" # TODO: Turn this into a class attribute
         self.large_json_llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest",safety_settings={
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
@@ -89,10 +89,7 @@ class ReportManager:
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
             stop_after_attempt=30, # Try twice
         )
-        self.openai_repr_llm = ChatOpenAI(temperature=0, model="gpt-4o-2024-05-13").bind(response_format={ "type": "json_object" }).with_retry(
-            wait_exponential_jitter=True, # Add jitter to the exponential backoff
-            stop_after_attempt=30, # Try twice
-        )
+
         self.openai_small_llm_json = ChatOpenAI(temperature=0, model="gpt-4o-mini").with_retry(
             # retry_if_exception_type=(ValueError,), # Retry only on ValueError
             wait_exponential_jitter=True, # Add jitter to the exponential backoff
@@ -197,7 +194,7 @@ class ReportManager:
             """
         )
         query_llm_chain = QUERY_PROMPT | self.sonnet_llm | query_json_parser
-        hyde_llm_chain = HYDE_PROMPT | self.flash_gemini_llm  | hyde_json_parser
+        hyde_llm_chain = HYDE_PROMPT | self.openai_small_llm_json  | hyde_json_parser
         multiquery_resp = query_llm_chain.invoke(input={
             'space':space,
             'perspective':perspective,
@@ -210,7 +207,9 @@ class ReportManager:
                 'question': resp,
                 'objective': context
             })
+        log.info("Generated Queries")
         hyde_resp = hyde_llm_chain.batch(hyde_input_list,config={"max_concurrency": 5,"callbacks": [BatchCallback(len(hyde_input_list))]})
+        log.info("Generated Hyde queries")
         hyde_queries = [resp['hyde'] for resp in hyde_resp]
         return multiquery_resp['query'],hyde_queries
 
@@ -224,7 +223,7 @@ class ReportManager:
         log.info(f"Space:{self.space} Perspective:{self.perspective} Context:{self.context}")
         multi_queries,hyde_queries = self.multi_query_generator(space,perspective,context)
         start_time = time.time()
-        space_info  = self.wv_manager.search_multi_threaded_multiple_queries(hyde_queries)
+        space_info  = self.vespa_manager.search_multi_threaded_multiple_queries(hyde_queries)
         log.info(f"Search Time:{time.time()-start_time}")
         log.info(f"Space Info:{len(space_info)}")
 
@@ -633,7 +632,7 @@ class ReportManager:
                     "subreddit": subreddit
                 }
             )
-        analyze_chain = chat_template | self.flash_gemini_llm | parser
+        analyze_chain = chat_template | self.openai_small_llm_json | parser
         results = analyze_chain.batch(batch_inputs,config={"max_concurrency": 10,"callbacks": [BatchCallback(len(batch_inputs))]})
     
         return results
@@ -739,7 +738,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
     
-        chain = chat_template | self.flash_gemini_llm | parser
+        chain = chat_template | self.openai_small_llm_json | parser
         log.info("Starting Batch Pain Points")
         # Chain Invoke
         response = chain.batch(queries,config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(queries))]})
@@ -1409,7 +1408,7 @@ class ReportManager:
                 "format_instructions" : parser.get_format_instructions()
             })
 
-        chain = chat_template | self.flash_gemini_llm  | parser
+        chain = chat_template | self.openai_small_llm_json  | parser
 
         # Chain Invoke
         personas_response = chain.batch(queries,config={"max_concurrency": concurrency,"callbacks": [BatchCallback(len(queries))]})
