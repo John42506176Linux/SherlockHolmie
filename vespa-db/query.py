@@ -3,6 +3,7 @@ from vespa.io import VespaResponse, VespaQueryResponse
 from datasets import load_dataset
 from datetime import datetime, timezone
 import json
+import time
 from typing import List, Dict, Any
 
 app = Vespa(url="http://35.91.108.46:8080")
@@ -85,13 +86,15 @@ if __name__ == "__main__":
     # Example usage
     print("All subreddits:", get_all_subreddit_names())
     
-    test_subreddit = "LocalLLM"
+    test_subreddit = "serverless"
     print(f"\nLatest posts from {test_subreddit}:", 
           get_latest_posts(test_subreddit))
-    
-    semantic_query_result = semantic_query("What is the best mac for Local LLms", limit=100)
+    start_time =  time.time()
+    semantic_query_result = semantic_query("What are the problems with serverless", limit=100)
+    end_time = time.time()
     print(f"\nSemantic query result:")
     for i, doc in enumerate(semantic_query_result, start=1):
         print(f"Post {i}:")
         for field, value in doc.items():
             print(f"  {field}: {value}")
+    print("Elapsed Time: ", end_time-start_time)
