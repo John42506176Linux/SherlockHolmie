@@ -274,9 +274,6 @@ schema reddit_post {
   }
 
   rank-profile weighted_closeness_combination inherits semantic-rescoring {
-    inputs {
-        query(qt) tensor<float>(qt{}, x[96])
-    }
     
     function unpack() {
         expression: unpack_bits(attribute(colbert))
@@ -322,7 +319,6 @@ schema reddit_post {
         rerank-count: 5000
         expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
       }
-
 
       match-features: closeness_body closeness_title  max_keyword_similarities secondPhase firstPhase bm25(title) bm25(body) bm25(keywords) bm25(subreddit_name)
   }
