@@ -298,7 +298,7 @@ schema reddit_post {
 
       second-phase  {
         # Weighted sum of closeness values with chosen weights
-        rerank-count: 5000
+        rerank-count: 100
         expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
       }
 
