@@ -154,17 +154,15 @@ schema reddit_post {
       query(q) tensor<bfloat16>(x[512])
       query(q_binary) tensor<int8>(x[64])
     }
-    function scale(val) {
-        expression: 2*atan(val/8)/(3.14159)
-    }
     function unpack_to_float() {
       expression: 2*unpack_bits(attribute(mrl_bq_embedding), bfloat16)-1
     }
-    function bm25sum() {
-      expression: bm25(title) + bm25(body) + bm25(subreddit_name) + bm25(keywords)
-    }
     first-phase {
       expression: sum(query(q) * unpack_to_float) # inverted hamming 
+    }
+    second-phase {
+      expression: closeness(field, body_embedding)
+      rerank-count: 1000
     }
     match-features: distance(field, mrl_bq_embedding) closeness(field, mrl_bq_embedding) firstPhase
   }
@@ -195,12 +193,15 @@ schema reddit_post {
           }
   }
 
-  rank-profile title-semantic-rescoring inherits semantic-rescoring {
+  rank-profile title-semantic-rescoring {
     inputs {
       query(q) tensor<bfloat16>(x[512])
       query(q_binary) tensor<int8>(x[64])
     }
-    
+    function bm25sum() {
+      expression: bm25(title) + bm25(body) + bm25(subreddit_name) + bm25(keywords)
+    }
+
     function unpack_to_float() {
       expression: 2*unpack_bits(attribute(title_mrl_bq_embeddings), bfloat16)-1
     }
@@ -223,6 +224,9 @@ schema reddit_post {
       expression {
         reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
       }
+    }
+    function scale(val) {
+        expression: 2*atan(val/8)/(3.14159)
     }
 
     function input_ids() {
