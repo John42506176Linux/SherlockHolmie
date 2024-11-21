@@ -164,7 +164,7 @@ schema reddit_post {
       expression: bm25(title) + bm25(body) + bm25(subreddit_name) + bm25(keywords)
     }
     first-phase {
-      expression: scale(sum(query(q) * unpack_to_float)) # inverted hamming 
+      expression: sum(query(q) * unpack_to_float) # inverted hamming 
     }
     match-features: distance(field, mrl_bq_embedding) closeness(field, mrl_bq_embedding) firstPhase
   }
