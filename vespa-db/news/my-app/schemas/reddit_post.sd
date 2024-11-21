@@ -154,11 +154,16 @@ schema reddit_post {
       query(q) tensor<bfloat16>(x[512])
       query(q_binary) tensor<int8>(x[64])
     }
+    function bm25sum() {
+      expression: bm25(title) + bm25(body) + bm25(subreddit_name) + bm25(keywords)
+    }
+
     function unpack_to_float() {
       expression: 2*unpack_bits(attribute(mrl_bq_embedding), bfloat16)-1
     }
     first-phase {
       expression: sum(query(q) * unpack_to_float) # inverted hamming 
+  
     }
     second-phase {
       expression: closeness(field, body_embedding)
@@ -314,6 +319,7 @@ schema reddit_post {
 
       second-phase  {
         # Weighted sum of closeness values with chosen weights
+        rerank-count: 5000
         expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
       }
 
