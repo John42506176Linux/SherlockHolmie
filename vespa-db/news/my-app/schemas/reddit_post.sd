@@ -2,7 +2,7 @@
 
 schema reddit_post {
 
-  document post {
+  document reddit_post {
 
     field reddit_id type string {
       indexing: attribute | summary
