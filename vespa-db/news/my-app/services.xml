@@ -5,6 +5,12 @@
     <!-- See https://docs.vespa.ai/en/reference/services-container.html -->
     <container id="default" version="1.0">
 
+    <nodes>
+        <jvm options="-Xms4g -Xmx4g -XX:+PrintCommandLineFlags -XX:+PrintGC"
+             gc-options="-XX:+UseG1GC -XX:MaxTenuringThreshold=15" />
+        <node hostalias="node0" />
+    </nodes>
+
         <!-- See https://docs.vespa.ai/en/embedding.html#huggingface-embedder -->
         <component id="mxbai" type="hugging-face-embedder">
   <transformer-model url="https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1/resolve/main/onnx/model_quantized.onnx"/> 
