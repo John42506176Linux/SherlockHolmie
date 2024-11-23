@@ -117,24 +117,10 @@ schema reddit_post {
       paged
     }
   }
-  field body_tokens type tensor<float>(d0[512]) {
-      indexing: input body | embed tokenizer | attribute 
-      attribute {
-          distance-metric: euclidean
-      }
-  }
 
   field colbert type tensor<int8>(dt{}, x[12]) {
     indexing: input body | embed colbert | attribute
     attribute: paged
-  }
-
-  onnx-model cross_encoder {
-      file: models/model_quantized.onnx
-      input input_ids: input_ids
-      input attention_mask: attention_mask
-      gpu-device: 0
-      output logits: logits
   }
   
 
