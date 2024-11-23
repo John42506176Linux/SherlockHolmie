@@ -193,6 +193,11 @@ schema reddit_post {
                   )
               }
           }
+
+          second-phase {
+              expression: max_sim()
+              rerank-count: 1000
+          }
           
   }
 
@@ -319,8 +324,11 @@ schema reddit_post {
         rerank-count: 1000
         expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
       }
-
       
+      global-phase {
+            rerank-count: 100
+            expression: max_sim()
+      }
 
       match-features: max_keyword_similarities secondPhase firstPhase bm25(title) bm25(body) bm25(keywords) bm25(subreddit_name)
   }
