@@ -5,6 +5,8 @@ from sentence_transformers.quantization import quantize_embeddings
 from pydantic import BaseModel
 import uvicorn
 import batched
+from typing import Union, List
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -16,11 +18,13 @@ xsmall_model = SentenceTransformer('mixedbread-ai/mxbai-embed-xsmall-v1')
 large_model.encode = batched.dynamically(large_model.encode)
 xsmall_model.encode = batched.dynamically(xsmall_model.encode)
 
+
+
 class EmbeddingsRequest(BaseModel):
-    input: str | list[str]
+    input: Union[str, List[str]]
     quantize: bool = False
-    quantize_format:str = "binary"
-    model_size: str = "large"  # Options: "large" or "xsmall"
+    quantize_format: str = "binary"
+    model_size: str = "large"  # Options: "large" or "xsmall"  # Options: "large" or "xsmall"
 
 @app.post("/embeddings")
 def embeddings(request: EmbeddingsRequest):
