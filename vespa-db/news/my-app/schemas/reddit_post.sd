@@ -117,11 +117,6 @@ schema reddit_post {
       paged
     }
   }
-
-  field colbert type tensor<int8>(dt{}, x[12]) {
-    indexing: input body | embed colbert | attribute
-    attribute: paged
-  }
   
 
   fieldset default {
@@ -158,34 +153,6 @@ schema reddit_post {
     match-features: distance(field, mrl_bq_embedding) closeness(field, mrl_bq_embedding) firstPhase
   }
 
-  rank-profile colbert-max-sim-context-level inherits bm25 {
-          inputs {
-              query(qt) tensor<float>(qt{}, x[96])
-          }
-
-          function unpack() {
-              expression: unpack_bits(attribute(colbert))
-          }
-           function max_sim() {
-              expression {
-                  sum(
-                      reduce(
-                          sum(
-                              query(qt) * unpack() , x
-                          ),
-                          max, dt
-                      ),
-                      qt
-                  )
-              }
-          }
-
-          second-phase {
-              expression: max_sim()
-              rerank-count: 1000
-          }
-          
-  }
 
   rank-profile title-semantic-rescoring {
     inputs {
@@ -216,23 +183,6 @@ schema reddit_post {
         query(qt) tensor<float>(qt{}, x[96])
     }
 
-    function unpack() {
-        expression: unpack_bits(attribute(colbert))
-    }
-    function max_sim() {
-        expression {
-            sum(
-                reduce(
-                    sum(
-                        query(qt) * unpack() , x
-                    ),
-                    max, dt
-                ),
-                qt
-            )
-        }
-    }
-
     function max_keyword_similarities() {
       expression {
         reduce(cosine_similarity(query(q),attribute(keyword_embeddings), x), max, p)
@@ -260,11 +210,6 @@ schema reddit_post {
         expression: (0.5 * (closeness_body() + scale(bm25(body)))) + 0.3 * (scale(bm25(keywords)) + max_keyword_similarities) + 0.2 * (scale(bm25(title)) + closeness_title())
       }
       
-      global-phase {
-            rerank-count: 100
-            expression: max_sim()
-      }
-
       match-features: max_keyword_similarities secondPhase firstPhase bm25(title) bm25(body) bm25(keywords) bm25(subreddit_name)
   }
 
