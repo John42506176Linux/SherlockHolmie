@@ -35,10 +35,11 @@ def embeddings(request: EmbeddingsRequest):
     embeddings = model.encode(request.input)
     
     # Optionally quantize the embeddings
+    binarized_embeddings = None
     if request.quantize:
-        embeddings = quantize_embeddings(embeddings, format=request.quantize_format)
+        binarized_embeddings = quantize_embeddings(embeddings, format=request.quantize_format)
     
-    return ORJSONResponse({"embeddings": embeddings})
+    return ORJSONResponse({"embeddings": embeddings, "binarized_embeddings": binarized_embeddings})
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=7998)
