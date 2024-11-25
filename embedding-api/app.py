@@ -21,7 +21,7 @@ xsmall_model.encode = batched.dynamically(xsmall_model.encode)
 
 
 class EmbeddingsRequest(BaseModel):
-    input: Union[str, List[str]]
+    input: List[str]
     quantize: bool = False
     quantize_format: str = "binary"
     dimensions: int = 512
