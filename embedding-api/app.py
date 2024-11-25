@@ -29,8 +29,6 @@ class EmbeddingsRequest(BaseModel):
 
 @app.post("/embeddings")
 def embeddings(request: EmbeddingsRequest):
-    print("INPUT TYPE: ", type(request.input))
-    print("INPUT: ", request.input)
     # Select the model based on the request
     model = large_model if request.model_size == "large" else xsmall_model
     
