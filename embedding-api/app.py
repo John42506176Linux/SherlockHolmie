@@ -7,6 +7,7 @@ import uvicorn
 import batched
 from typing import List, Union
 from pydantic import BaseModel
+import time
 
 app = FastAPI()
 
@@ -38,6 +39,7 @@ def embeddings(request: EmbeddingsRequest):
     Returns:
         dict: A dictionary containing the generated embeddings and binarized embeddings separately.
     """
+    start_time = time.time()
     # Select the model based on the request
     model = large_model if request.model_size == "large" else xsmall_model
 
@@ -85,7 +87,7 @@ def embeddings(request: EmbeddingsRequest):
         response_data = {"embeddings": truncated_embeddings}
         if request.quantize:
             response_data["binarized_embeddings"] = binarized_embeddings
-
+    print("Time taken: ", time.time() - start_time)
     return ORJSONResponse(response_data)
 
 if __name__ == "__main__":
