@@ -39,6 +39,7 @@ def embeddings(request: EmbeddingsRequest):
     Returns:
         dict: A dictionary containing the generated embeddings and binarized embeddings separately.
     """
+    print("Start")
     total_start_time = time.time()
     
     # Step 1: Model Selection
