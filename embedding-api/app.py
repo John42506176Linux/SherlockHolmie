@@ -1,13 +1,12 @@
+import time
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.quantization import quantize_embeddings
 from pydantic import BaseModel
+from typing import Union, List
 import uvicorn
 import batched
-from typing import List, Union
-from pydantic import BaseModel
-import time
 
 app = FastAPI()
 
@@ -19,14 +18,15 @@ xsmall_model = SentenceTransformer('mixedbread-ai/mxbai-embed-xsmall-v1')
 large_model.encode = batched.dynamically(large_model.encode)
 xsmall_model.encode = batched.dynamically(xsmall_model.encode)
 
-
-
 class EmbeddingsRequest(BaseModel):
-    input: Union[List[str],List[List[str]]]
+    input: Union[List[str], List[List[str]]]
     quantize: bool = False
     quantize_format: str = "binary"
     dimensions: int = 512
-    model_size: str = "large"  # Options: "large" or "xsmall"  # Options: "large" or "xsmall"
+    model_size: str = "large"  # Options: "large" or "xsmall"
+
+MAX_RETRIES = 3
+RETRY_DELAY = 1  # seconds
 
 @app.post("/embeddings", response_class=ORJSONResponse)
 def embeddings(request: EmbeddingsRequest):
@@ -39,7 +39,6 @@ def embeddings(request: EmbeddingsRequest):
     Returns:
         dict: A dictionary containing the generated embeddings and binarized embeddings separately.
     """
-    print("Start")
     total_start_time = time.time()
     
     # Step 1: Model Selection
@@ -61,9 +60,18 @@ def embeddings(request: EmbeddingsRequest):
         step3_time = time.time() - step3_start
         print(f"Flattening input time: {step3_time:.4f} seconds")
 
-        # Step 4: Encode All Inputs
+        # Step 4: Encode All Inputs with Retries
         step4_start = time.time()
-        embeddings = model.encode(flattened_input)
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                embeddings = model.encode(flattened_input)
+                break
+            except Exception as e:
+                print(f"Attempt {attempt} - Error during encoding embeddings: {e}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAY)
+                else:
+                    return ORJSONResponse({"error": "Failed to generate embeddings after multiple retries."}, status_code=500)
         step4_time = time.time() - step4_start
         print(f"Encoding embeddings time: {step4_time:.4f} seconds")
 
@@ -77,7 +85,11 @@ def embeddings(request: EmbeddingsRequest):
         step6_start = time.time()
         binarized_embeddings = None
         if request.quantize:
-            binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
+            try:
+                binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
+            except Exception as e:
+                print(f"Error during quantization: {e}")
+                return ORJSONResponse({"error": "Failed to quantize embeddings."}, status_code=500)
         step6_time = time.time() - step6_start
         print(f"Quantizing embeddings time: {step6_time:.4f} seconds")
 
@@ -106,9 +118,18 @@ def embeddings(request: EmbeddingsRequest):
     else:
         # Handle flat list input
 
-        # Step 3: Encode All Inputs
+        # Step 3: Encode All Inputs with Retries
         step3_start = time.time()
-        embeddings = model.encode(request.input)
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                embeddings = model.encode(request.input)
+                break
+            except Exception as e:
+                print(f"Attempt {attempt} - Error during encoding embeddings: {e}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAY)
+                else:
+                    return ORJSONResponse({"error": "Failed to generate embeddings after multiple retries."}, status_code=500)
         step3_time = time.time() - step3_start
         print(f"Encoding embeddings time: {step3_time:.4f} seconds")
 
@@ -122,7 +143,11 @@ def embeddings(request: EmbeddingsRequest):
         step5_start = time.time()
         binarized_embeddings = None
         if request.quantize:
-            binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
+            try:
+                binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
+            except Exception as e:
+                print(f"Error during quantization: {e}")
+                return ORJSONResponse({"error": "Failed to quantize embeddings."}, status_code=500)
         step5_time = time.time() - step5_start
         print(f"Quantizing embeddings time: {step5_time:.4f} seconds")
 
