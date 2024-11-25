@@ -5,7 +5,7 @@ from sentence_transformers.quantization import quantize_embeddings
 from pydantic import BaseModel
 import uvicorn
 import batched
-from typing import Union, List
+from typing import List
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -29,6 +29,8 @@ class EmbeddingsRequest(BaseModel):
 
 @app.post("/embeddings")
 def embeddings(request: EmbeddingsRequest):
+    print("INPUT TYPE: ", type(request.input))
+    print("INPUT: ", request.input)
     # Select the model based on the request
     model = large_model if request.model_size == "large" else xsmall_model
     
