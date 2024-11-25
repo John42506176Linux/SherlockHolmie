@@ -39,27 +39,49 @@ def embeddings(request: EmbeddingsRequest):
     Returns:
         dict: A dictionary containing the generated embeddings and binarized embeddings separately.
     """
-    start_time = time.time()
-    # Select the model based on the request
+    total_start_time = time.time()
+    
+    # Step 1: Model Selection
+    step1_start = time.time()
     model = large_model if request.model_size == "large" else xsmall_model
+    step1_time = time.time() - step1_start
+    print(f"Model selection time: {step1_time:.4f} seconds")
 
-    # Determine if the input is a list of lists
+    # Step 2: Input Type Check
+    step2_start = time.time()
     is_nested = isinstance(request.input, list) and all(isinstance(i, list) for i in request.input)
+    step2_time = time.time() - step2_start
+    print(f"Input type checking time: {step2_time:.4f} seconds")
 
     if is_nested:
-        # Flatten the list of lists
+        # Step 3: Flatten the Input
+        step3_start = time.time()
         flattened_input = [item for sublist in request.input for item in sublist]
-        # Encode all inputs at once
-        embeddings = model.encode(flattened_input)
-        # Truncate embeddings
-        truncated_embeddings = [embedding[:request.dimensions] for embedding in embeddings]
+        step3_time = time.time() - step3_start
+        print(f"Flattening input time: {step3_time:.4f} seconds")
 
-        # Optionally quantize the embeddings
+        # Step 4: Encode All Inputs
+        step4_start = time.time()
+        embeddings = model.encode(flattened_input)
+        step4_time = time.time() - step4_start
+        print(f"Encoding embeddings time: {step4_time:.4f} seconds")
+
+        # Step 5: Truncate Embeddings
+        step5_start = time.time()
+        truncated_embeddings = [embedding[:request.dimensions] for embedding in embeddings]
+        step5_time = time.time() - step5_start
+        print(f"Truncating embeddings time: {step5_time:.4f} seconds")
+
+        # Step 6: Quantize Embeddings (if required)
+        step6_start = time.time()
         binarized_embeddings = None
         if request.quantize:
             binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
+        step6_time = time.time() - step6_start
+        print(f"Quantizing embeddings time: {step6_time:.4f} seconds")
 
-        # Split the embeddings back to the original nested structure
+        # Step 7: Split Embeddings Back to Nested Structure
+        step7_start = time.time()
         split_embeddings = []
         split_binarized = [] if request.quantize else None
         index = 0
@@ -70,24 +92,50 @@ def embeddings(request: EmbeddingsRequest):
                 sub_binarized = binarized_embeddings[index: index + len(sublist)]
                 split_binarized.append(sub_binarized)
             index += len(sublist)
+        step7_time = time.time() - step7_start
+        print(f"Splitting embeddings time: {step7_time:.4f} seconds")
 
+        # Step 8: Assemble Response Data
+        step8_start = time.time()
         response_data = {"embeddings": split_embeddings}
         if request.quantize:
             response_data["binarized_embeddings"] = split_binarized
+        step8_time = time.time() - step8_start
+        print(f"Assembling response data time: {step8_time:.4f} seconds")
     else:
         # Handle flat list input
-        embeddings = model.encode(request.input)
-        truncated_embeddings = [embedding[:request.dimensions] for embedding in embeddings]
 
-        # Optionally quantize the embeddings
+        # Step 3: Encode All Inputs
+        step3_start = time.time()
+        embeddings = model.encode(request.input)
+        step3_time = time.time() - step3_start
+        print(f"Encoding embeddings time: {step3_time:.4f} seconds")
+
+        # Step 4: Truncate Embeddings
+        step4_start = time.time()
+        truncated_embeddings = [embedding[:request.dimensions] for embedding in embeddings]
+        step4_time = time.time() - step4_start
+        print(f"Truncating embeddings time: {step4_time:.4f} seconds")
+
+        # Step 5: Quantize Embeddings (if required)
+        step5_start = time.time()
         binarized_embeddings = None
         if request.quantize:
             binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
+        step5_time = time.time() - step5_start
+        print(f"Quantizing embeddings time: {step5_time:.4f} seconds")
 
+        # Step 6: Assemble Response Data
+        step6_start = time.time()
         response_data = {"embeddings": truncated_embeddings}
         if request.quantize:
             response_data["binarized_embeddings"] = binarized_embeddings
-    print("Time taken: ", time.time() - start_time)
+        step6_time = time.time() - step6_start
+        print(f"Assembling response data time: {step6_time:.4f} seconds")
+
+    total_time = time.time() - total_start_time
+    print(f"Total processing time: {total_time:.4f} seconds")
+    
     return ORJSONResponse(response_data)
 
 if __name__ == "__main__":
