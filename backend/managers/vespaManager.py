@@ -129,21 +129,23 @@ class VespaManager:
 
     
 
-    def query(self,query,hits=500):
+    def query(self,query,hits=700):
         """Perform a semantic search query."""
         with self.app.syncio(connections=10, compress="auto") as session:
             response: VespaQueryResponse = session.query(
                 hits=hits,
-                body={
-                    "yql": "select * from reddit_post where (userQuery()) or ({targetHits:5000}nearestNeighbor(body_embedding,q)) or ({targetHits:5000}nearestNeighbor(mrl_bq_embedding,q_binary)) or ({targetHits:5000}nearestNeighbor(title_embedding,q)) or ({targetHits:5000}nearestNeighbor(keyword_embeddings,q))",
-                    "query": query,
-                    "queryProfile": 'largeQueryProfile',
-                    "ranking": "weighted_closeness_combination",
-                    "timeout": "1000s",
-                    "input.query(q)": "embed(mxbai,@query)",
-                    "input.query(q_binary)": "embed(mxbai,@query)",
-                },
+                body= {
+                "yql": "select * from reddit_post where (userQuery()) or ({targetHits:5000}nearestNeighbor(mrl_bq_embedding,q_binary)) or ({targetHits:5000}nearestNeighbor(title_embedding,q))",
+                "query": query,
+                "queryProfile": 'largeQueryProfile',
+                "ranking": "weighted_closeness_combination",
+                "timeout": "1000s",
+                "input.query(q)": "embed(mxbai,@query)",
+                "input.query(qt)" : "embed(colbert,@query)",
+                "input.query(q_binary)": "embed(mxbai,@query)",
+            },
             )
+            
             reddit_documents = {}
             for hit in response.hits:
                 fields = hit['fields']

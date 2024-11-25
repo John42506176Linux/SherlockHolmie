@@ -24,6 +24,7 @@ class EmbeddingsRequest(BaseModel):
     input: Union[str, List[str]]
     quantize: bool = False
     quantize_format: str = "binary"
+    dimensions: int = 512
     model_size: str = "large"  # Options: "large" or "xsmall"  # Options: "large" or "xsmall"
 
 @app.post("/embeddings")
@@ -33,13 +34,14 @@ def embeddings(request: EmbeddingsRequest):
     
     # Encode the input
     embeddings = model.encode(request.input)
+    truncated_embeddings = [embedding[:request.dimensions] for embedding in embeddings]
     
     # Optionally quantize the embeddings
     binarized_embeddings = None
     if request.quantize:
-        binarized_embeddings = quantize_embeddings(embeddings, format=request.quantize_format)
+        binarized_embeddings = quantize_embeddings(truncated_embeddings, precision=request.quantize_format)
     
-    return ORJSONResponse({"embeddings": embeddings, "binarized_embeddings": binarized_embeddings})
+    return ORJSONResponse({"embeddings": truncated_embeddings, "binarized_embeddings": binarized_embeddings})
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=7998)
