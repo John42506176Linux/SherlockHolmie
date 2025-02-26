@@ -1,6 +1,37 @@
 
 # Welcome to Sherlock
 
+SherlockHolmie is a data analytics and research platform that analyzes Reddit content to generate insights for
+businesses or researchers. The system:
+
+1. Data Collection: Downloads and processes Reddit posts/comments from specified subreddits using the Reddit API.
+2. Data Processing:
+  - Stores content in PostgreSQL databases
+  - Creates vector embeddings for semantic search
+  - Uses LLMs (Claude, GPT-4, Gemini) to extract insights
+3. Research Generation:
+  - Identifies pain points in communities
+  - Creates user personas
+  - Extracts behavioral and attitudinal insights
+  - Supports specific queries about topics
+4. Frontend Interface:
+  - Modern Next.js application
+  - Chat interface for interacting with insights
+  - Report viewing and generation capabilities
+  - Authentication and user management
+5. Cloud Infrastructure:
+  - Uses AWS CDK for infrastructure as code
+  - Includes AWS resources like:
+      - Lambda functions
+    - ECS clusters
+    - RDS databases
+    - VPC configuration
+    - EC2 instances
+6. Deployment:
+  - Docker containers for services
+  - Celery for task processing
+  - Various deployment scripts
+
 Important Folders 
 - /cdk_stacks -  Important to deploy Code to AWS
     - CDK Stacks
