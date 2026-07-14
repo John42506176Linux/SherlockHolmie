@@ -2,7 +2,15 @@
 # Welcome to Sherlock
 
 SherlockHolmie is a data analytics and research platform that analyzes Reddit content to generate insights for
-businesses or researchers. The system:
+businesses or researchers.
+
+**Architecture:** see [ARCHITECTURE.md](ARCHITECTURE.md) for the full write-up. Diagrams:
+
+![Sherlock pipeline: Ingest → Report generation → Serve](docs/assets/pipeline-diagram.png)
+
+![End-to-end report generation sequence](docs/assets/end-to-end-flow.png)
+
+The system:
 
 1. Data Collection: Downloads and processes Reddit posts/comments from specified subreddits using the Reddit API.
 2. Data Processing:
