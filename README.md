@@ -40,22 +40,13 @@ Important Folders
     - Lambda Stack - Code for deploying AWS Lambda Endpoint for public use.
     - Database Stack - Code for deploying Datatabase
 -/Lambda - Code for AWS Lambda task to start subreddit downloader
--/Backend 
-    - Co
+-/Backend
+    - Report generation, ETL, and managers
+
 ## Useful commands
 
- * cdk deploy -  Deploy stack to aws.
- * tasks/deploy.sh - Deploy
- * Updating Objective - 
-UPDATE "Report"
-SET context = 'New Report Objective'
-WHERE id = 'Report ID';
- *Updating email - 
- * Updating email - 
-UPDATE "Report"
-SET email = 'ryan@joinbutler.com'
-WHERE id = '89a9bd5f-2788-42ec-9797-6ad7f13a5aaa';
- * Updating 
+ * `cdk deploy` - Deploy stack to AWS
+ * `tasks/deploy.sh` - Deploy task services
 
 ## How to deploy report generation service locally
  * cd backend
